@@ -70,3 +70,36 @@ A mock observation creates a snapshot-only description. It is stale after its ob
 Predictions initially match event kind, source, task and occurrence window against subsequently accepted events. They become supported when matching evidence is received, expired when the window passes without a match, or unresolved otherwise. Late matching evidence can update an expired interpretation to supported. Semantic contradiction, prediction cancellation and object-specific prediction predicates remain future extensions. Expiry is a derived query result, not a fabricated observation.
 
 `world(now)` is the latest retained interpretation with validity evaluated at `now`, not an as-of-history reconstruction. Rebuild deterministically replays the journal without enqueueing work. The initial implementation rebuilds projections on each acceptance inside the same transaction: simple and inspectable, but O(history length) per event. Incremental reducers/pagination are needed before large continuous sensor workloads. No model calls, automatic physical actions, affect updates or GUI are added here.
+
+## Persistent goals and drive review (J05)
+
+Migration 3 adds goals, an append-only lifecycle audit, drive snapshots and an arbitration checkpoint. Existing journal/outbox/projections are preserved. Goal ownership is the local operator: this API is not exposed as an LLM tool.
+
+Create `goal.json`:
+
+```json
+{
+  "goal_id": "task-001",
+  "description": "Inspect the mock object",
+  "scope": ["mock.inspect"],
+  "success_event_kind": "tool.observation",
+  "created_at": "2026-11-05T00:00:00Z",
+  "budget": 3,
+  "drive": "uncertainty"
+}
+```
+
+```bash
+jane goals add jane.db --file goal.json
+jane goals review jane.db --allow mock.inspect
+jane goals list jane.db
+jane goals cancel jane.db --id task-001
+```
+
+Review is explicit and makes no model/tool call. A later coordinator will call it on scheduled ticks/events. It restores persisted pending work without requiring another user prompt; it does not install a daemon. An empty eligible set returns `rest` and no selected goal. Permission filtering uses the supplied allowed-tool set on every review; dependencies must be complete and a goal must have budget remaining. Priority 0 is highest. Aging is bounded within a priority class, and a near/overdue deadline increases urgency. Equal rankings use goal ID for deterministic ties.
+
+The Python `Goals` service exposes wait (future time and/or source), block, resume, cancel, fail and complete operations. Event wakeups require new journal entries for the same task after the wait cursor. Completion requires a matching task/event-kind reference, an initial structural success predicate rather than full semantic verification. All transitions invalidate prior proposal generations. `authorize` atomically reserves a step only for the selected active generation and a scoped tool; the future executor must still recheck current external permissions before dispatch. There are no external actions in this change.
+
+Commitment, uncertainty and continuity goals share the eligibility/urgency evaluator. Resource discipline is enforced as a hard step-budget constraint rather than an independently competing goal. Drive evaluations, urgency, review times, selected goal and profile parameters persist. Profile curiosity bounds optional observations; patience sets the recovery threshold; commitment intervals and switch margins reduce same-class oscillation. Higher priority work can preempt immediately. All observation attempts must also reserve a step against the hard budget.
+
+Lifecycle changes are audited in `goal_changes`, separate from sensor events; J04 event projection rebuilding does not erase them. Existing-goal-only dependencies prevent cycles in this initial immutable dependency graph. Scope and dependency editing, semantic success predicates, a continuously running scheduler, emotional modulation and real dispatch remain later work. Backward review-clock changes fail explicitly.

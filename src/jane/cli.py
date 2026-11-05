@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Sequence
 
 from jane import __version__
+from jane.motivation.goals import Goal, Goals
 from jane.runner import Scenario, demo_scenario, run
 from jane.storage.journal import Journal
 
@@ -24,8 +25,39 @@ def main(argv: Sequence[str] | None = None) -> int:
         "operation", choices=["status", "seed-demo", "drain", "world", "timeline", "rebuild"]
     )
     store.add_argument("database", type=Path)
+    goals = commands.add_parser("goals", help="manage persistent goals without model calls")
+    goals.add_argument("operation", choices=["add", "list", "review", "cancel"])
+    goals.add_argument("database", type=Path)
+    goals.add_argument("--file", type=Path)
+    goals.add_argument("--id")
+    goals.add_argument("--allow", action="append", default=[])
     args = parser.parse_args(argv)
     try:
+        if args.command == "goals":
+            from datetime import UTC, datetime
+
+            journal = Journal(args.database)
+            try:
+                service = Goals(journal)
+                if args.operation == "add":
+                    if args.file is None:
+                        raise ValueError("add requires --file")
+                    service.add(Goal.model_validate_json(args.file.read_text()))
+                elif args.operation == "cancel":
+                    if args.id is None:
+                        raise ValueError("cancel requires --id")
+                    service.change(args.id, "cancel", datetime.now(UTC))
+                elif args.operation == "review":
+                    sys.stdout.write(
+                        json.dumps(service.review(datetime.now(UTC), tuple(args.allow))) + "\n"
+                    )
+                    return 0
+                sys.stdout.write(
+                    json.dumps([g.model_dump(mode="json") for g in service.list()]) + "\n"
+                )
+                return 0
+            finally:
+                journal.close()
         if args.command == "journal":
             journal = Journal(args.database)
             try:
