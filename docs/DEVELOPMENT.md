@@ -32,6 +32,23 @@ All six architecture decision variants validate. This runner executes only `mock
 
 The event union covers the four event kinds used by the demonstration. New event/tool variants require explicit typed schemas. Scenario length is capped at 32 decisions. Script IDs, start time and fake-clock advances make output reproducible. The runner validates context identity and evidence existence before tool dispatch.
 
-J01 and the initial J02 slice are implemented. Full profile/affect contracts, capture/output adapters, persistent journal, real coordinator, cancellation scheduling, drives, emotion dynamics, live providers, audio, camera and GUI remain future work. The mock tool only reads immutable fixture observations. There is no SQLite database or external side effect.
+J01 and the initial J02 slice are implemented. Full profile/affect contracts, capture/output adapters, real coordinator, cancellation scheduling, drives, emotion dynamics, live providers, audio, camera and GUI remain future work. The mock tool only reads immutable fixture observations. J03 adds SQLite event storage; there are no external tool effects.
 
 Core uses Pydantic; development adds Ruff, mypy and build. Media/provider dependency groups will be added with their adapters rather than installing unused dependencies now. No license has been selected.
+
+## Durable journal (J03)
+
+```bash
+jane journal seed-demo jane.db
+jane journal status jane.db
+jane journal drain jane.db
+jane journal seed-demo jane.db
+```
+
+Each command runs in a separate process. Seeding accepts six demo trace events and queues six internal receipts. Status shows schema version, event count, task last-event projections, checkpoint and queue counts. Drain acknowledges internal receipts only; it does not replay tool actions. Reseeding is idempotent, so completed receipts remain completed.
+
+The journal commits events, task projections, the acceptance checkpoint and outbox work atomically, acknowledges only after commit and rejects conflicting deduplication keys. Event occurrence time remains in the validated JSON while ingest sequence determines replay order. SQLite transactions serialize writers; each Journal connection belongs to its creating thread.
+
+Workers claim with a lease token and bounded attempt count (default three); expired leases recover on the next claim. Stale workers cannot settle reassigned work. Retry delays postpone eligibility; exhausted work becomes failed. These semantics are at-least-once delivery: future effectful workers require idempotency/reconciliation, not blind replay. Caller-supplied queue times are epoch seconds; production callers must use a consistent clock.
+
+Migration 1 creates events, outbox, task projection, checkpoint and reserved profile tables. Future schema versions are rejected without downgrade. Profiles have no activation API yet; full task lifecycle, world projections and the persistent cognitive coordinator remain J04 onward. Use the same attempt policy for all workers. Errors propagate and the CLI exits nonzero rather than acknowledging failed storage.
