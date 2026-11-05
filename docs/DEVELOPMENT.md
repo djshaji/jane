@@ -103,3 +103,73 @@ The Python `Goals` service exposes wait (future time and/or source), block, resu
 Commitment, uncertainty and continuity goals share the eligibility/urgency evaluator. Resource discipline is enforced as a hard step-budget constraint rather than an independently competing goal. Drive evaluations, urgency, review times, selected goal and profile parameters persist. Profile curiosity bounds optional observations; patience sets the recovery threshold; commitment intervals and switch margins reduce same-class oscillation. Higher priority work can preempt immediately. All observation attempts must also reserve a step against the hard budget.
 
 Lifecycle changes are audited in `goal_changes`, separate from sensor events; J04 event projection rebuilding does not erase them. Existing-goal-only dependencies prevent cycles in this initial immutable dependency graph. Scope and dependency editing, semantic success predicates, a continuously running scheduler, emotional modulation and real dispatch remain later work. Backward review-clock changes fail explicitly.
+
+## Appraisal and simulated affect (J06)
+
+Migration 4 adds affect state/configuration, event/rule deduplication, repetition counters,
+seen task/object pairs and evidence-linked transition history. Migration does not appraise
+old events retroactively. New event appraisal shares the acceptance transaction; progress
+and failure appraisal share the goal lifecycle transaction. SQLite failure rolls back both.
+These are functional state variables, not measured feelings or consciousness.
+
+```bash
+jane affect status jane.db
+jane affect history jane.db
+jane affect recover jane.db
+jane affect configure jane.db --file affect.json
+jane affect reset jane.db
+```
+
+Example `affect.json`: `{"computation": true, "behaviour": false, "expressive_tone": false}`.
+Omitted settings take defaults; configuration replaces the whole profile, rather than
+patching it. Bounds, baselines, positive recovery constants and finite numeric values are
+validated. Configuration and reset are audited operator APIs, never model tools. Reset
+keeps deduplication and repetition history, so resetting cannot replay old rewards.
+
+Rules (`affect-rules-v1`):
+
+- Verified progress requires an explicit goal completion referencing an accepted tool
+  observation for that task. A model response or finish proposal alone receives no reward.
+  Completion still uses J05's structural predicate; semantic success verification is future work.
+- Novelty is the first fresh observation of an object ID within a live task, identified by
+  its goal ID. New event IDs/descriptions for that same object do not earn more novelty.
+  Different objects share a source/task novelty contribution cap. This is exact identity
+  matching, not semantic or visual novelty detection.
+- The second and subsequent runtime-recorded failed attempts increase frustration.
+  `Goals.record_failure` is a trusted runtime/operator API: one call means one failed
+  attempt; a future executor must deduplicate action-result delivery before calling it.
+- Irrelevant observation/message bursts increase activation starting with the third
+  input in the source/task window. High activation suppresses optional observations.
+  Other event kinds and stale/future-dated observations do not contribute.
+
+Default repetition windows are 60 seconds, with a per-component absolute contribution
+cap of 0.3 and a `1/(1+count)` diminishing factor. Counters saturate; source, rule and task
+form the grouping key. The first two irrelevant inputs count but contribute zero.
+The stale threshold is 30 seconds against receipt time. All transitions retain evidence
+IDs, versioned rules, configuration, decayed before/after state and applied contributions.
+`goal_change:<seq>` references the lifecycle audit, whose completion row in turn cites
+its observation. There is no live reappraisal when a rule/configuration changes.
+
+Recovery uses UTC elapsed time and component-specific exponential constants. `state(now)`
+is a read-only decayed view. Call `recover(now)` **once at runtime startup**, before
+reviewing goals, to persist recovery capped at the configured interval (default one hour).
+The explicit CLI recovery command demonstrates this until J07 owns application startup.
+Negative elapsed time is clamped to zero and the persisted clock watermark never moves
+backwards; the recovery/transition record flags the anomaly. Recovery fabricates no events.
+Normal in-process decay has no recovery cap. Computation disabled freezes the vector and
+consumes incoming appraisals without contributions; re-enabling never backfills rewards.
+
+Goal review applies affect after eligibility and priority selection. Interest >= 0.28 adds
+one optional observation, capped at three and the remaining hard step budget. Frustration
+>= 0.2 selects `recover`; activation >= 0.8 suppresses optional sampling. Behaviour can be
+turned off independently from computation. Tone is a separate persisted flag reported to
+future consumers; no response wording is changed in this milestone. Global frustration
+influences strategy only; it is never evidence of failure in the selected task. Permissions,
+world facts, success predicates and the authorize/reservation path are unchanged.
+
+The test suite compares the same goal/world with behavioural influence on/off: allowance
+changes from one to two after novel evidence, while denied tools and exhausted budgets
+remain ineligible. This proves a bounded parameter effect, not improved task performance.
+No continuous scheduler, model-based appraisal, live devices, GUI or experiential learning
+is introduced. J07 will assemble snapshots and coordinate these components. Repetition
+keys/seen objects and audit retention need cleanup policies before continuous workloads.

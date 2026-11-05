@@ -119,6 +119,8 @@ Each package should fit one focused change or a small sequence of changes with a
 
 ### J06 — Appraisal and simulated emotional state
 
+**Implemented:** deterministic rules, transactional audit, bounded modulation, operator controls and explicit startup recovery. See [J06 scope and limitations](DEVELOPMENT.md#appraisal-and-simulated-affect-j06). J07 will own startup recovery and continuous coordination; semantic appraisal and comparative task-performance evaluation remain later work.
+
 **Depends on:** J04, J05. **Architecture:** Section 9.
 
 - Implement valence, activation, interest, satisfaction and frustration with component-specific bounds/baselines/recovery constants.
@@ -477,3 +479,4 @@ The work-package IDs remain stable; their order is determined by dependencies ra
 The first product release is complete only when a user can launch JANE from the desktop, type or speak, enable a camera, receive a grounded response, inspect the relevant timeline/goals/internal state, modify a validated profile, recover a pending task after restart and reliably stop all activity.
 
 The CLI remains installed for scripted scenarios, diagnostics and optional headless operation. It uses the same engine contracts and does not introduce a second implementation of memory, drives or decision-making.
+

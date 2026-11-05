@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Sequence
 
 from jane import __version__
+from jane.affect.engine import Affect, AffectConfig
 from jane.motivation.goals import Goal, Goals
 from jane.runner import Scenario, demo_scenario, run
 from jane.storage.journal import Journal
@@ -31,8 +32,41 @@ def main(argv: Sequence[str] | None = None) -> int:
     goals.add_argument("--file", type=Path)
     goals.add_argument("--id")
     goals.add_argument("--allow", action="append", default=[])
+    affect = commands.add_parser("affect", help="inspect and configure simulated affect")
+    affect.add_argument("operation", choices=["status", "history", "configure", "recover", "reset"])
+    affect.add_argument("database", type=Path)
+    affect.add_argument("--file", type=Path)
     args = parser.parse_args(argv)
     try:
+        if args.command == "affect":
+            from datetime import UTC, datetime
+
+            journal = Journal(args.database)
+            try:
+                affect_service = Affect(journal)
+                now = datetime.now(UTC)
+                if args.operation == "configure":
+                    if args.file is None:
+                        raise ValueError("configure requires --file")
+                    affect_service.configure(
+                        AffectConfig.model_validate_json(args.file.read_text()), now
+                    )
+                if args.operation == "reset":
+                    affect_service.reset(now)
+                if args.operation == "recover":
+                    affect_service.recover(now)
+                output_data = (
+                    affect_service.history()
+                    if args.operation == "history"
+                    else {
+                        "state": affect_service.state(now),
+                        "config": affect_service.config().model_dump(mode="json"),
+                    }
+                )
+                sys.stdout.write(json.dumps(output_data, sort_keys=True) + "\n")
+                return 0
+            finally:
+                journal.close()
         if args.command == "goals":
             from datetime import UTC, datetime
 

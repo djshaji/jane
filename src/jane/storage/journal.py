@@ -10,6 +10,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Iterator
 
+from jane.affect.engine import Affect
 from jane.core.contracts import EVENT, Event
 from jane.state.projection import project, view
 
@@ -51,7 +52,7 @@ class Journal:
             self.db.execute("PRAGMA synchronous=FULL")
             with self.transaction():
                 version = self.db.execute("PRAGMA user_version").fetchone()[0]
-                if version not in (0, 1, 2, 3):
+                if version not in (0, 1, 2, 3, 4):
                     raise ValueError(f"unsupported database version: {version}")
                 if version == 0:
                     for statement in DDL:
@@ -83,6 +84,23 @@ class Journal:
                         "body TEXT NOT NULL,profile TEXT NOT NULL)"
                     )
                     self.db.execute("PRAGMA user_version=3")
+                if version < 4:
+                    for statement in (
+                        "CREATE TABLE affect_config(id INTEGER PRIMARY KEY "
+                        "CHECK(id=1),body TEXT NOT NULL)",
+                        "CREATE TABLE affect_state(id INTEGER PRIMARY KEY "
+                        "CHECK(id=1),body TEXT NOT NULL)",
+                        "CREATE TABLE appraisals(evidence TEXT NOT NULL,"
+                        "rule TEXT NOT NULL,PRIMARY KEY(evidence,rule))",
+                        "CREATE TABLE affect_transitions(seq INTEGER PRIMARY KEY,"
+                        "evidence TEXT NOT NULL,rule TEXT NOT NULL,body TEXT NOT NULL)",
+                        "CREATE TABLE affect_repetition(key TEXT PRIMARY KEY,"
+                        "start REAL NOT NULL,count INTEGER NOT NULL,used TEXT NOT NULL)",
+                        "CREATE TABLE affect_seen(task TEXT NOT NULL,"
+                        "object TEXT NOT NULL,PRIMARY KEY(task,object))",
+                    ):
+                        self.db.execute(statement)
+                    self.db.execute("PRAGMA user_version=4")
         except BaseException:
             self.db.close()
             raise
@@ -140,6 +158,7 @@ class Journal:
                 (event.event_id, event.received_at.timestamp()),
             )
             self._project()
+            Affect(self).event(event)
         return seq
 
     def events(self) -> tuple[Event, ...]:
