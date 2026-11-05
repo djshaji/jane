@@ -4,7 +4,18 @@ JANE is a proposed persistent cognitive system built around an LLM decision engi
 
 **End product:** A Python GTK desktop application for Linux, with a persistent engine and a CLI for development, diagnostics and automation. Local or hosted model inference is configurable.
 
-**Status:** Architecture and planning. The runtime has not yet been implemented.
+**Status:** Initial offline foundation (J01 and initial J02). No live model, devices, GUI or persistence yet.
+
+## Run the offline demo
+
+Requires Python 3.12. See [developer setup](docs/DEVELOPMENT.md) for a reproducible environment.
+
+```bash
+python -m pip install .
+jane demo
+```
+
+The demo emits a deterministic JSON trace using a scripted adapter and read-only mock observation.
 
 ## Project documents
 
@@ -33,3 +44,4 @@ The timeline, world model, self-model, goals and emotional state persist outside
 Begin with a single-user Python application, an asynchronous coordinator, SQLite persistence, a fake clock and simulated tools. Establish a text decision loop, then add a GTK frontend using local IPC, audio, vision, real tools and proactive operation. Desktop release includes conversation, camera/microphone controls, timeline and internal-state inspectors, profile editing, explicit background/quit behaviour and installation packaging. See the architecture document for implementation phases and acceptance criteria.
 
 Simulated emotional states are functional control variables; the design makes no claim of subjective experience.
+

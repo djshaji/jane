@@ -1,0 +1,85 @@
+{
+  "schema_version": 1,
+  "start": "2026-11-05T00:00:00Z",
+  "request_id": "request-001",
+  "generation": 0,
+  "input": {
+    "event_id": "user-001",
+    "source_id": "cli",
+    "occurred_start": "2026-11-05T00:00:00Z",
+    "occurred_end": "2026-11-05T00:00:00Z",
+    "received_at": "2026-11-05T00:00:00Z",
+    "task_id": "task-001",
+    "correlation_id": "interaction-001",
+    "kind": "user.message",
+    "provenance_class": "user_statement",
+    "payload": {
+      "text": "Inspect object-001."
+    }
+  },
+  "observations": [
+    {
+      "object_id": "object-001",
+      "description": "A blue ceramic cup."
+    }
+  ],
+  "steps": [
+    {
+      "advance_seconds": 1.0,
+      "decision": {
+        "decision_id": "decision-001",
+        "request_id": "request-001",
+        "task_id": "task-001",
+        "generation": 0,
+        "snapshot_id": "snapshot-001",
+        "summary": "call_tool",
+        "evidence_ids": [
+          "user-001"
+        ],
+        "type": "call_tool",
+        "tool": "mock.inspect",
+        "arguments": {
+          "object_id": "object-001"
+        }
+      }
+    },
+    {
+      "advance_seconds": 1.0,
+      "decision": {
+        "decision_id": "decision-002",
+        "request_id": "request-001",
+        "task_id": "task-001",
+        "generation": 0,
+        "snapshot_id": "snapshot-002",
+        "summary": "respond",
+        "evidence_ids": [
+          "replay-observation-001"
+        ],
+        "type": "respond",
+        "text": "The mock observation describes a blue ceramic cup."
+      }
+    },
+    {
+      "advance_seconds": 1.0,
+      "decision": {
+        "decision_id": "decision-003",
+        "request_id": "request-001",
+        "task_id": "task-001",
+        "generation": 0,
+        "snapshot_id": "snapshot-003",
+        "summary": "finish",
+        "evidence_ids": [
+          "replay-observation-001"
+        ],
+        "type": "finish"
+      }
+    }
+  ],
+  "expected": {
+    "terminal": "finished",
+    "response": "The mock observation describes a blue ceramic cup.",
+    "inspected_objects": [
+      "object-001"
+    ]
+  }
+}

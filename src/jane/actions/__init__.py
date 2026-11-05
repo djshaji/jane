@@ -1,0 +1,1 @@
+"""JANE offline foundation components."""

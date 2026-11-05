@@ -67,17 +67,24 @@ An illustrative decision is:
 
 ```json
 {
-  "task_id": "task-17",
-  "state_version": 8,
-  "decision": "request_observation",
-  "tool": "camera.capture",
-  "arguments": {"camera_id": "desk"},
-  "summary": "A fresh frame is needed to answer the user's question.",
-  "evidence_ids": ["speech-42"]
+  "decision_id": "decision-018",
+  "request_id": "request-018",
+  "task_id": "task-001",
+  "generation": 2,
+  "snapshot_id": "snapshot-008",
+  "type": "request_observation",
+  "observation": {
+    "source_id": "camera.desk",
+    "modality": "image",
+    "max_age_ms": 2000,
+    "purpose": "Obtain a closer view of the object's label"
+  },
+  "summary": "The existing image is insufficient to identify the object.",
+  "evidence_ids": ["evt-0042"]
 }
 ```
 
-The runtime validates the decision type, tool name, arguments and state version. A syntactically correct response can still be wrong. Reject unsupported actions, handle malformed output with bounded recovery, and terminate when budgets are exhausted. Treat model-provided confidence as a claim, not a calibrated probability.
+The runtime validates the decision type, variant-specific payload, task generation and snapshot references. The architecture decision union is the canonical wire format. The initial offline runner validates capture requests but does not execute them. A syntactically correct response can still be wrong. Reject unsupported actions, handle malformed output with bounded recovery, and terminate when budgets are exhausted. Treat model-provided confidence as a claim, not a calibrated probability.
 
 ## 6. Runtime behaviour
 
@@ -291,3 +298,4 @@ Official Gemini documentation demonstrates that supported live model APIs can re
 - Anthropic, Building Effective Agents: https://www.anthropic.com/engineering/building-effective-agents
 
 Anthropic's engineering discussion distinguishes predefined workflows from model-directed agents and recommends beginning with simple composable patterns. The particular module boundaries, implementation phases and evaluation gates above are proposed for JANE; they are design recommendations rather than reported experimental results.
+
