@@ -67,3 +67,8 @@ elapsed-time recovery, repetition caps and bounded modulation of goal review. In
 with `jane affect status jane.db` and `jane affect history jane.db`. Configuration, recovery
 and operator reset are documented in [developer setup](docs/DEVELOPMENT.md#appraisal-and-simulated-affect-j06).
 The offline demo remains deterministic; the persistent cognitive coordinator is next (J07).
+
+J07 adds immutable bounded contexts and an async cognitive coordinator with cancellation,
+stale-result rejection, persistent call budgets and typed errors. Run `jane coordinator-demo`
+for a deterministic proposal pipeline. It uses fixture evidence; action dispatch and
+lifecycle execution remain J08.
