@@ -28,3 +28,6 @@ jobs:
           /tmp/jane-wheel/bin/jane demo > jane-first.json
           /tmp/jane-wheel/bin/jane demo > jane-second.json
           cmp jane-first.json jane-second.json
+          /tmp/jane-wheel/bin/jane coordinator-demo > coordinator-first.json
+          /tmp/jane-wheel/bin/jane coordinator-demo > coordinator-second.json
+          cmp coordinator-first.json coordinator-second.json

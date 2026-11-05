@@ -52,7 +52,7 @@ class Journal:
             self.db.execute("PRAGMA synchronous=FULL")
             with self.transaction():
                 version = self.db.execute("PRAGMA user_version").fetchone()[0]
-                if version not in (0, 1, 2, 3, 4):
+                if version not in (0, 1, 2, 3, 4, 5):
                     raise ValueError(f"unsupported database version: {version}")
                 if version == 0:
                     for statement in DDL:
@@ -101,19 +101,35 @@ class Journal:
                     ):
                         self.db.execute(statement)
                     self.db.execute("PRAGMA user_version=4")
+                if version < 5:
+                    self.db.execute(
+                        "CREATE TABLE cognitive_requests(id INTEGER PRIMARY KEY,task TEXT NOT NULL,"
+                        "interaction TEXT NOT NULL,status TEXT NOT NULL,calls INTEGER NOT NULL,"
+                        "snapshot TEXT,decision_id TEXT UNIQUE,usage TEXT)"
+                    )
+                    self.db.execute(
+                        "CREATE UNIQUE INDEX cognitive_single_active ON cognitive_requests(status) "
+                        "WHERE status='active'"
+                    )
+                    self.db.execute("PRAGMA user_version=5")
         except BaseException:
             self.db.close()
             raise
 
     @contextmanager
     def transaction(self) -> Iterator[None]:
-        self.db.execute("BEGIN IMMEDIATE")
+        nested = self.db.in_transaction
+        self.db.execute("SAVEPOINT jane_nested" if nested else "BEGIN IMMEDIATE")
         try:
             yield
-            self.db.execute("COMMIT")
+            self.db.execute("RELEASE jane_nested" if nested else "COMMIT")
         except BaseException:
             if self.db.in_transaction:
-                self.db.execute("ROLLBACK")
+                if nested:
+                    self.db.execute("ROLLBACK TO jane_nested")
+                    self.db.execute("RELEASE jane_nested")
+                else:
+                    self.db.execute("ROLLBACK")
             raise
 
     def close(self) -> None:

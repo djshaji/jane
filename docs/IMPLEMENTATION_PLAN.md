@@ -135,6 +135,8 @@ Each package should fit one focused change or a small sequence of changes with a
 
 ### J07 — Context builder and cognitive coordinator
 
+**Implemented:** immutable bounded contexts, async proposal coordination, stale-result fencing, persistent call budgets and typed errors. See [J07 scope](DEVELOPMENT.md#context-and-cognitive-coordinator-j07). Decisions are validated proposals; J08 owns execution/lifecycle effects and J09 adds live providers.
+
 **Depends on:** J02–J06. **Architecture:** Sections 3–4, 11.
 
 - Assemble immutable snapshots containing the goal, recent timeline, world/self state, drives, affect, templates, available tools and remaining budgets.

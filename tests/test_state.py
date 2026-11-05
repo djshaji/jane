@@ -138,7 +138,7 @@ class StateTests(unittest.TestCase):
         db.close()
         migrated = Journal(path)
         try:
-            self.assertEqual(migrated.status()["schema_version"], 4)
+            self.assertEqual(migrated.status()["schema_version"], 5)
             self.assertEqual(migrated.status()["outbox"], {"pending": 1})
             self.assertEqual(len(migrated.world(self.now)["episodes"]), 1)
         finally:

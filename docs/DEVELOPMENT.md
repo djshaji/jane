@@ -173,3 +173,75 @@ remain ineligible. This proves a bounded parameter effect, not improved task per
 No continuous scheduler, model-based appraisal, live devices, GUI or experiential learning
 is introduced. J07 will assemble snapshots and coordinate these components. Repetition
 keys/seen objects and audit retention need cleanup policies before continuous workloads.
+
+## Context and cognitive coordinator (J07)
+
+```bash
+jane coordinator-demo
+```
+
+This deterministic, offline demonstration selects a persistent goal, builds a snapshot,
+accepts a scripted scoped tool proposal, receives a **fixture-supplied** observation, then
+accepts response and finish proposals citing that observation. It dispatches no tool,
+emits no user response and does not mark the goal complete. The existing `jane demo`
+continues to exercise the original fixture executor. J08 will connect accepted proposals
+to durable intents, execution, verification and lifecycle effects. `wait` and `fail` are
+validated proposals at this stage, not executed lifecycle transitions.
+
+`Coordinator.step(interaction_id)` performs one async cognitive request (plus at most one
+formatting repair) and returns a strict `Outcome`. Call `startup()` once under exclusive
+application ownership before accepting work: it marks abandoned requests cancelled and
+runs J06 capped affect recovery. No startup method may be used to steal a live request.
+The runtime is one process, event loop and Journal owner; multi-process leader election,
+provider subprocess termination and a continuous scheduler remain later work.
+
+Migration 5 stores request snapshots, statuses, decision IDs, runtime usage and provider
+call counts. A partial unique index permits only one active request in the database.
+Calls are reserved before invocation and count against the configured interaction limit
+(default eight), including formatting repairs and failed calls. Recreating the coordinator
+or restarting cannot reset an interaction's consumed calls. A new interaction ID identifies
+new operator/runtime work; the LLM does not choose it. Limits are trusted runtime settings.
+
+Snapshots contain goal/success criterion/scope, generation, dependencies via their record
+version, relevant world claims/predictions, global self-state, drives, profile, affect,
+template, mock tool argument schemas and hard/optional budgets. Arbitrary nested
+projections are canonical JSON strings to make the snapshot deeply immutable. Task events
+are included in ingest order with provenance. The latest user instruction and observation
+are essential; optional history is selected newest-first, preserving ingest order in the
+final request. Relevant world claims and task constraints are never silently truncated.
+
+Budgets are UTF-8 **bytes**, not estimated tokens: input defaults to 32 KiB and separately
+reserved output to 8 KiB. Essential overflow records `context_overflow` without invoking
+the adapter. A future provider must map its tokenizer and total context window onto these
+limits. Oversized output is rejected without parsing or repair. Only schema/formatting
+errors permit one repair; stale, unauthorized or semantically invalid decisions do not.
+
+A content hash versions the full goal, dependencies, task evidence, relevant entity claims,
+global self-state, profile and affect configuration. Completion checks recompute this view,
+including time-dependent freshness. Superseding task input, cancellation/generation changes,
+relevant corrections, changed profile or revoked tool access reject old results. Unrelated
+task events do not invalidate the request unless they change a shared relevant record.
+The affect vector is informational snapshot state; unrelated affect transitions alone do
+not invalidate it. J08 must recheck execution preconditions and current budgets at dispatch.
+
+All decision variants pass the canonical strict schema. References must be present in the
+snapshot; duplicate decision IDs and context mismatches fail. Tools must be both scoped and
+currently permitted. `finish` requires matching observation evidence under the initial
+structural success predicate. Observation capture requests validate structurally but return
+`unsupported_observation` until a capture adapter exists. An empty eligible goal set is idle
+and performs no model call. Decisions do not reserve tool steps; J08 owns that boundary.
+
+Cancellation immediately fences results and requests adapter cancellation. The caller
+returns without waiting for a cancellation-resistant provider; that provider's in-process
+slot stays occupied until it exits. Async adapters must yield to the loop: blocking native
+work needs process isolation in a future provider. A configured real async timeout bounds
+waiting, while the injected monotonic clock measures request elapsed time (deterministic
+under FakeClock). Provider output cannot claim usage: calls, response bytes and elapsed
+seconds are measured by the runtime; token/cost usage is not estimated. Errors are typed
+`cognition.error` events, never raw provider exceptions or partial actions.
+
+Accepted decisions and request status/usage commit atomically, as do typed errors and their
+request status. Journal transactions now support nested SQLite savepoints for this purpose.
+A storage failure propagates and leaves unfinished work for explicit startup recovery;
+it does not acknowledge an accepted proposal. Formatting-repair prompts currently expose a
+boolean repair flag to the offline adapter; real provider instructions are J09 work.

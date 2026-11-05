@@ -18,6 +18,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="jane", description="JANE offline foundation")
     parser.add_argument("--version", action="version", version=__version__)
     commands = parser.add_subparsers(dest="command", required=True)
+    commands.add_parser("coordinator-demo", help="run the offline J07 proposal pipeline")
     commands.add_parser("demo", help="replay the packaged deterministic scenario")
     replay = commands.add_parser("replay", help="validate and replay a JSON fixture")
     replay.add_argument("fixture", type=Path)
@@ -38,6 +39,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     affect.add_argument("--file", type=Path)
     args = parser.parse_args(argv)
     try:
+        if args.command == "coordinator-demo":
+            import asyncio
+
+            from jane.cognition.demo import coordinator_demo
+
+            sys.stdout.write(asyncio.run(coordinator_demo()))
+            return 0
         if args.command == "affect":
             from datetime import UTC, datetime
 

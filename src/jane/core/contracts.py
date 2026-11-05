@@ -180,6 +180,32 @@ class PredictionEvent(EventBase):
     payload: Prediction
 
 
+class CognitiveError(Contract):
+    request_id: Identifier
+    category: Literal[
+        "cancelled",
+        "context_overflow",
+        "budget_exhausted",
+        "timeout",
+        "adapter_error",
+        "invalid_output",
+        "output_overflow",
+        "stale_context",
+        "invalid_decision",
+        "unauthorized",
+        "unsupported_observation",
+    ]
+    calls: NonNegative
+    output_bytes: NonNegative
+    elapsed_seconds: Annotated[float, Field(ge=0)]
+
+
+class CognitiveErrorEvent(EventBase):
+    kind: Literal["cognition.error"]
+    provenance_class: Literal["runtime_status"]
+    payload: CognitiveError
+
+
 Event = Annotated[
     UserEvent
     | DecisionEvent
@@ -187,7 +213,8 @@ Event = Annotated[
     | ResponseEvent
     | ClaimEvent
     | SelfEvent
-    | PredictionEvent,
+    | PredictionEvent
+    | CognitiveErrorEvent,
     Field(discriminator="kind"),
 ]
 EVENT: TypeAdapter[Event] = TypeAdapter(Event)
