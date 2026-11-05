@@ -9,6 +9,8 @@ JANE is a proposed persistent cognitive system built around an LLM decision engi
 - [Roadmap](Roadmap-v2.md): scope, design principles, drives, emotional dynamics and staged implementation.
 - [Detailed architecture](docs/JANE_Architecture_Design.md): components, contracts, data models, state machines, persistence, recovery and evaluation.
 
+- [Implementation plan](docs/IMPLEMENTATION_PLAN.md): ordered work packages, dependencies, deliverables and acceptance tests.
+
 ## Core cycle
 
 Observe → interpret → update timeline and state → evaluate drives → select goal → decide → execute → verify.
