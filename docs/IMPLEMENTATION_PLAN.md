@@ -1,23 +1,23 @@
 # JANE implementation plan
 
 **Project:** Just Another Neural Engine  
-**Version:** 1.0 · 5 November 2026  
+**Version:** 1.1 · 5 November 2026  
 **Status:** Planned; no implementation tasks below are marked complete.  
 **Baseline:** Repository commit `c3517bf212b93be1cf4d4ed818b80d82ab4b8472`.
 
-This plan turns the [architecture specification](JANE_Architecture_Design.md) and [roadmap](../Roadmap-v2.md) into ordered, independently reviewable implementation work. The first release is a functioning cognitive loop with persistent temporal state, explicit drives and simulated affect. Audio, vision and proactive behaviour are added to that working foundation.
+This plan turns the [architecture specification](JANE_Architecture_Design.md) and [roadmap](../Roadmap-v2.md) into ordered, independently reviewable implementation work. The end product is an installable Linux desktop application written in Python with a GTK GUI, backed by persistent temporal state, explicit drives and simulated affect. The CLI is a development and automation interface. An offline cognitive loop is the first milestone; the user-facing release requires the desktop milestones below.
 
 ## 1. Delivery strategy
 
 Build complete, small interactions before expanding the component set. The first demonstration accepts a text request, creates a goal, selects a mock action, records its result, updates motivation/affect and returns to idle. It must survive restart and reject stale actions before live inference or devices become dependencies.
 
-Use a single Python process with an asynchronous coordinator and a single database writer. Keep provider and device implementations behind interfaces. Begin with a CLI and inspectable state; postpone a desktop UI until the core works. The target operating system remains configurable: do not introduce platform-specific core logic.
+Build the core initially as one Python engine process with an asynchronous coordinator and a single database writer. For desktop delivery, run the GTK frontend as a separate process communicating with that engine over local IPC. Keep provider and device implementations behind interfaces. Begin with a CLI, then introduce the desktop shell immediately after the persistent core works. Target Linux first while keeping core logic independent of GTK and platform-specific device integration.
 
 ### Working defaults
 
 | Decision | Default for initial work | Revisit when |
 | --- | --- | --- |
-| Interface | CLI with text, state and timeline commands | Core demonstration is accepted |
+| Interface | Python GTK desktop product; CLI for development/automation | GTK major version and supported Linux distribution verified in G01 |
 | Inference | Scripted stub first; one real provider later | Provider comparison scenario is ready |
 | Storage | SQLite and local asset files | Measured requirements exceed this design |
 | Validation | One strict typed schema system | Choose and pin during repository bootstrap |
@@ -35,10 +35,10 @@ Select the supported Python version and exact dependencies during bootstrap agai
 | --- | --- | --- | --- |
 | M0 — Buildable foundation | Installable package and offline scenario harness | J01–J02 | Schemas and fake time work without devices/network |
 | M1 — Persistent cognitive core | Text → goal → mock action → verified result → idle | J03–J08 | Replay, cancellation and crash tests pass |
-| M2 — Live text cognition | Same loop using a real model | J09 | Structured decisions and bounded failure handling |
-| M3 — Multimodal interaction | Speak, inspect an object, receive an answer | J10–J11 | Fresh evidence and interrupt handling |
+| M2 — Desktop text alpha | GUI conversation using the persistent engine and real model | J09, G01–G02 | Responsive desktop, reconnect and structured-decision handling |
+| M3 — Multimodal desktop alpha | Speak, inspect an object and view state in the GUI | J10–J11, G03–G04 | Fresh evidence, live inspection and interrupt handling |
 | M4 — Useful task continuity | Real tools, durable memory and restart recovery | J12–J13 | Verified effects and deletion/recovery checks |
-| M5 — Bounded proactive JANE | Standing goals, multiple drives and evaluated affect | J14–J16 | Budgeted autonomous work, stable idle, reproducible release |
+| M5 — Installable desktop release | Standing goals, evaluated affect, explicit lifecycle and packaging | J14–J16, G05–G06 | Budgeted work, stable idle, clear stop behaviour and clean-machine installation |
 | M6 — Optional embodiment | Simulated high-level actuator tasks | J17 | Independent control limits before hardware |
 
 Critical path: J01 → J02 → J03 → J04 → J05/J06 → J07 → J08 → J09. Audio and camera work share the core and may be developed independently after M2, but their combined demonstration must pass an integration gate. Real-tool work depends on J08/J09; proactive execution depends on durable memory and action recovery.
@@ -249,7 +249,7 @@ Each package should fit one focused change or a small sequence of changes with a
 
 ### J16 — Integrated release and handover
 
-**Depends on:** J15. **Architecture:** Sections 16, 20.
+**Depends on:** J15, G06. **Architecture:** Sections 16, 20.
 
 - Run the complete scenario matrix on a clean installation.
 - Verify install/build instructions, optional dependencies and configuration defaults.
@@ -334,7 +334,146 @@ Every change should remain runnable. Preserve prior passing scenarios and add ca
 | Duplicate/unknown external effects | J08/J12 | Intent journal, idempotency and reconciliation |
 | Context growth hides important evidence | J07/J13 | Explicit budget priority, retrieval and provenance |
 | Configuration changes break replay | J02 onward | Record versions and use recorded rules for replay |
-| Desktop UI scope delays core | After M4 | Keep CLI first; decide GUI separately |
+| Desktop scope delays core | G01 onward | Keep engine independent; build GUI after M1 with bounded G01–G06 scope |
 | Time estimates are unreliable | After M1 | Estimate from actual delivery and integration evidence |
 
-Implementation is ready to begin with J01–J02. Provider selection, hardware and GUI choices do not block the offline foundation.
+Implementation starts with J01–J02. Provider and hardware selection do not block the offline foundation. G01 resolves the GTK/platform packaging details before desktop implementation; the GUI itself is required for the end product.
+
+
+## 9. Desktop product specification
+
+The main product is a Python GTK application launched from the Linux application menu. Launching it connects to one engine for the active user/profile or starts that engine if none exists. A second launch focuses the existing window or attaches to the existing engine; it must not start duplicate background work.
+
+The home screen shows conversation, current activity, a microphone button, a camera preview toggle and persistent pause/stop controls. Detailed views are available through navigation rather than overwhelming the conversation screen.
+
+| View | Required functionality | Engine dependency |
+| --- | --- | --- |
+| Conversation | Typed input, responses, push-to-talk, playback interruption, request status and visible failures | J07–J11 |
+| Perception | Source selection, enable/disable, capture indicator, timestamped preview and device errors | J10–J11 |
+| Timeline | Filter observations, inferences, decisions, actions and corrections; follow evidence links | J04, J13 |
+| Goals | Create, inspect, cancel and resume eligible work; show deadlines, progress and blockage | J05, J14 |
+| Internal state | Drives and affect with current values, recent changes and causal events | J05–J06 |
+| Profile | Configure inclinations, templates and affect rules; validate, apply and restore a prior profile | J05–J06, J13 |
+| Memory | Inspect provenance, correct information and delete selected entries | J13 |
+| Settings | Provider/local-model configuration, data handling, budgets, devices and lifecycle preference | J09–J14 |
+
+Emotion indicators use text and numeric values in addition to colour. The interface exposes functional state and its causes without presenting measured consciousness or inferred emotions of the user.
+
+A desktop application can use either hosted or local inference. Settings must clearly show which mode is active and what enabled inputs may leave the machine. No model download or paid API call is required to run the offline demonstration.
+
+## 10. Desktop work packages
+
+### G01 — GTK baseline and frontend boundary
+
+**Depends on:** J02, J08. **Can overlap with:** J09.
+
+- Select the GTK major version and Python bindings after a short compatibility spike on the supported Linux distribution. Record the result and exact dependency/install method; do not mix GTK major versions.
+- Build a minimal window with a conversation placeholder, status area and navigation.
+- Define a frontend-neutral engine client interface shared by GUI and CLI.
+- Define versioned local IPC requests, responses and event subscriptions. Use request IDs, generation/snapshot references, acknowledgment semantics and structured errors.
+- Keep the engine as the only database writer and owner of microphone/camera/model sessions. The frontend never writes state tables or calls the model directly.
+- Use local access restrictions and connection validation; do not expose a network listener by default.
+- Keep IPC and media processing off the GUI thread. Deliver UI changes through the selected toolkit's supported main-loop mechanism.
+- Add proposed modules `src/jane/desktop/`, `src/jane/interface/client.py` and `src/jane/interface/ipc/`.
+
+**Deliverables:** desktop shell, toolkit decision record, IPC contract and fake-engine frontend fixture.
+
+**Acceptance:** the GUI launches with the fake engine; slow/disconnected engine conditions do not freeze the window. Core imports/tests do not require GTK. Protocol version mismatch displays a useful error.
+
+### G02 — Connected conversation and command flow
+
+**Depends on:** G01, J08. **Live-model gate additionally requires:** J09.
+
+- Implement input submission, pending/completed/failed message states and text responses.
+- Show active goal, current operation and connection state.
+- Add cancel, pause/resume and stop commands that use runtime control paths rather than asking the LLM.
+- Implement command deduplication and reconnect: fetch a snapshot, then subscribe from its cursor; detect gaps and resynchronize.
+- Treat partial model text as presentation only. Only a fully validated decision can authorize an action.
+- Restore recent conversation after reopening; do not resubmit old requests.
+- Keep stale engine state visibly marked and disable commands whose validity depends on a lost connection.
+
+**Acceptance:** a submitted request appears once after disconnect/reconnect; an old-generation response cannot revive a cancelled task. Input, window controls and stop remain responsive during a delayed model call.
+
+### G03 — Voice and camera controls
+
+**Depends on:** G02, J10–J11.
+
+- Wire push-to-talk and playback interruption into the conversation view.
+- Add device selectors, explicit enable controls, capture status and failure/retry feedback.
+- Deliver bounded, downsampled preview frames independently of durable observation events. Opening preview must not invoke the LLM for every frame.
+- Distinguish preview-only display from capture enabled for cognitive tasks.
+- Show image capture age and whether evidence is live, stale or unavailable.
+- Avoid queues of obsolete frames; drop preview updates under load while preserving accepted commands and capture results.
+- Handle unplug/replug and permission errors without restarting the whole application.
+
+**Acceptance:** the user can speak, inspect an object and interrupt the reply entirely from the GUI. Disabling a source stops its capture; old images never appear as a live feed. Preview traffic does not block stop or text commands.
+
+### G04 — Timeline, motivation and profile inspectors
+
+**Depends on:** G02, J04–J06. **Memory controls additionally require:** J13.
+
+- Add paginated/virtualized timeline navigation, event-type filters and evidence details.
+- Add goal and drive views showing why work is active, waiting, blocked or complete.
+- Add bounded affect charts and a causal event list; offer independent switches for computation, behavioural influence and expressive tone.
+- Implement profile editing with validation, dirty-state indication, apply/cancel and version history.
+- Add memory correction/deletion with a scoped preview of what will change.
+- Keep unsaved UI drafts separate from authoritative engine state; handle configuration-version conflicts without silent overwrites.
+- Link user-facing labels to documented operational meanings rather than unexplained internal variable names.
+
+**Acceptance:** a user can trace a frustration change to a failed attempt and see the resulting recovery strategy. Invalid profile values are rejected without changing active state. Large histories remain navigable and deleted memories disappear from refreshed retrieval views.
+
+### G05 — Window, engine and background lifecycle
+
+**Depends on:** G02, J13–J14.
+
+Define and implement explicit lifecycle semantics:
+
+| Action | Required behaviour |
+| --- | --- |
+| Pause | Suspend new deliberation/proactive execution; retain state. Keep capture controls explicit rather than silently assuming pause disables devices. |
+| Stop all | Cancel pending work, stop capture/playback, suppress subsequent steps and reconcile effects already in flight. Keep the window available for inspection. |
+| Close, default mode | Stop capture/work and gracefully shut down the engine, then close the window. Do not wait indefinitely on an unresponsive provider. |
+| Close, background mode enabled | Detach the window; keep only explicitly configured background sources/goals active. |
+| Quit JANE | Shut down the engine and all application activity regardless of background preference. |
+| Reopen | Attach to the existing engine and synchronize once; avoid duplicate tasks or capture sessions. |
+
+- Default to no background operation. Provide an explicit preference explaining which goals/sources may continue.
+- Provide a desktop-supported visible status/notification mechanism and accessible stop/quit entry point. Do not assume every Linux desktop has a compatible tray.
+- If the supported desktop lacks a reliable background control surface, keep background mode unavailable and explain the limitation.
+- Make login autostart separate and off by default.
+- Handle GUI crashes and engine loss: default session mode stops sensitive capture/work after a bounded frontend lease expires; explicitly enabled background mode may continue within its configuration.
+- Use per-user engine ownership/locking and stale-lock recovery to prevent duplicate engines.
+- Document shutdown deadlines, unknown action reconciliation and reconnect behaviour.
+
+**Acceptance:** closing under each mode matches the table; reopening does not duplicate work. Killing the GUI in default mode stops capture after the configured lease. Stop/quit remains accessible in enabled background mode. Autostart does not turn on implicitly.
+
+### G06 — Packaging, accessibility and desktop acceptance
+
+**Depends on:** G03–G05, J15. **Precedes:** J16.
+
+- Choose one supported Linux packaging/distribution path following G01's compatibility results. Deliver application launcher metadata, icon and documented installation/removal.
+- Include or declare required GTK/binding/media dependencies. Separate model-provider configuration from application installation.
+- Provide a first-run flow for inference mode, optional credentials, input devices, workspace scope and budgets.
+- Ship a clearly labelled offline demo profile and sample data; keep live capture disabled until enabled.
+- Test keyboard navigation, focus order, accessible labels, scaling, light/dark appearance and state indicators that do not depend on colour.
+- Confirm install, upgrade, data migration, backup/restore and removal behaviour. Preserve user data on ordinary uninstall unless deletion is explicitly requested.
+- Run a clean-machine acceptance session with the offline engine and a separately configured live provider/device setup.
+- Record supported distribution/toolkit versions and known desktop limitations.
+
+**Acceptance:** users can install, launch, configure, interact, inspect state and quit without a terminal. Offline mode works without keys. Upgrade preserves compatible memory/profile state. The release documents measured responsiveness and tested hardware/platform scope.
+
+## 11. Integrated build order and completion criteria
+
+The work-package IDs remain stable; their order is determined by dependencies rather than numeric order:
+
+1. J01–J08: offline persistent core and CLI.
+2. G01–G02 with J09: desktop shell, local IPC and live text conversation.
+3. J10–J11 with G03: microphone, speech and camera interaction.
+4. J12–J13 with G04: real tools, durable memory and inspection/editing views.
+5. J14–J15 with G05: proactive behaviour, evaluation and explicit background lifecycle.
+6. G06, then J16: packaging and desktop release.
+7. J17: optional embodiment after the software product is proven.
+
+The first product release is complete only when a user can launch JANE from the desktop, type or speak, enable a camera, receive a grounded response, inspect the relevant timeline/goals/internal state, modify a validated profile, recover a pending task after restart and reliably stop all activity.
+
+The CLI remains installed for scripted scenarios, diagnostics and optional headless operation. It uses the same engine contracts and does not introduce a second implementation of memory, drives or decision-making.
