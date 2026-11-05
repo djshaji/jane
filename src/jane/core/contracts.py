@@ -125,7 +125,69 @@ class ResponseEvent(EventBase):
     payload: Message
 
 
+class Claim(Contract):
+    entity_id: Identifier
+    predicate: Identifier
+    value: Text
+    basis: Literal["observed", "user_reported", "inferred", "predicted"]
+    evidence_ids: Annotated[tuple[Identifier, ...], Field(min_length=1)]
+    valid_from: AwareDatetime
+    valid_until: AwareDatetime | None = None
+    supersedes: Identifier | None = None
+
+    @model_validator(mode="after")
+    def interval(self) -> Self:
+        if self.valid_until is not None and self.valid_until <= self.valid_from:
+            raise ValueError("claim validity must be a positive interval")
+        return self
+
+
+class ClaimEvent(EventBase):
+    kind: Literal["state.claim"]
+    provenance_class: Literal["interpretation"]
+    payload: Claim
+
+
+class SelfState(Contract):
+    category: Literal["capability", "source_health", "activity", "pending_action", "commitment"]
+    key: Identifier
+    value: Text
+
+
+class SelfEvent(EventBase):
+    kind: Literal["state.self"]
+    provenance_class: Literal["runtime_status"]
+    payload: SelfState
+
+
+class Prediction(Contract):
+    expected_kind: Literal["tool.observation", "communication.response"]
+    source_id: Identifier
+    not_before: AwareDatetime
+    deadline: AwareDatetime
+    evidence_ids: Annotated[tuple[Identifier, ...], Field(min_length=1)]
+
+    @model_validator(mode="after")
+    def window(self) -> Self:
+        if self.deadline < self.not_before:
+            raise ValueError("prediction window reversed")
+        return self
+
+
+class PredictionEvent(EventBase):
+    kind: Literal["state.prediction"]
+    provenance_class: Literal["prediction"]
+    payload: Prediction
+
+
 Event = Annotated[
-    UserEvent | DecisionEvent | ObservationEvent | ResponseEvent, Field(discriminator="kind")
+    UserEvent
+    | DecisionEvent
+    | ObservationEvent
+    | ResponseEvent
+    | ClaimEvent
+    | SelfEvent
+    | PredictionEvent,
+    Field(discriminator="kind"),
 ]
 EVENT: TypeAdapter[Event] = TypeAdapter(Event)

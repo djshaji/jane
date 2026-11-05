@@ -20,13 +20,29 @@ def main(argv: Sequence[str] | None = None) -> int:
     replay = commands.add_parser("replay", help="validate and replay a JSON fixture")
     replay.add_argument("fixture", type=Path)
     store = commands.add_parser("journal", help="inspect durable storage or queue demo events")
-    store.add_argument("operation", choices=["status", "seed-demo", "drain"])
+    store.add_argument(
+        "operation", choices=["status", "seed-demo", "drain", "world", "timeline", "rebuild"]
+    )
     store.add_argument("database", type=Path)
     args = parser.parse_args(argv)
     try:
         if args.command == "journal":
             journal = Journal(args.database)
             try:
+                if args.operation == "world":
+                    from datetime import UTC, datetime
+
+                    sys.stdout.write(
+                        json.dumps(journal.world(datetime.now(UTC)), sort_keys=True) + "\n"
+                    )
+                    return 0
+                if args.operation == "timeline":
+                    sys.stdout.write(
+                        json.dumps([e.model_dump(mode="json") for e in journal.timeline()]) + "\n"
+                    )
+                    return 0
+                if args.operation == "rebuild":
+                    journal.rebuild()
                 if args.operation == "seed-demo":
                     for event in run(demo_scenario()).events:
                         journal.accept(event)

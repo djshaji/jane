@@ -1,14 +1,17 @@
 """Transactional journal. Queue delivery is at least once, not external exactly once."""
 
+import json
 import math
 import sqlite3
 import uuid
 from contextlib import contextmanager
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
-from typing import Iterator
+from typing import Any, Iterator
 
 from jane.core.contracts import EVENT, Event
+from jane.state.projection import project, view
 
 DDL = (
     "CREATE TABLE events (seq INTEGER PRIMARY KEY AUTOINCREMENT, event_id TEXT UNIQUE NOT NULL, "
@@ -48,12 +51,19 @@ class Journal:
             self.db.execute("PRAGMA synchronous=FULL")
             with self.transaction():
                 version = self.db.execute("PRAGMA user_version").fetchone()[0]
-                if version not in (0, 1):
+                if version not in (0, 1, 2):
                     raise ValueError(f"unsupported database version: {version}")
                 if version == 0:
                     for statement in DDL:
                         self.db.execute(statement)
                     self.db.execute("PRAGMA user_version=1")
+                if version < 2:
+                    self.db.execute(
+                        "CREATE TABLE projection (id INTEGER PRIMARY KEY CHECK(id=1), "
+                        "last_seq INTEGER NOT NULL, body TEXT NOT NULL)"
+                    )
+                    self._project()
+                    self.db.execute("PRAGMA user_version=2")
         except BaseException:
             self.db.close()
             raise
@@ -110,6 +120,7 @@ class Journal:
                 "INSERT INTO outbox(work_id,status,eligible) VALUES(?,'pending',?)",
                 (event.event_id, event.received_at.timestamp()),
             )
+            self._project()
         return seq
 
     def events(self) -> tuple[Event, ...]:
@@ -117,6 +128,27 @@ class Journal:
             EVENT.validate_json(row[0])
             for row in self.db.execute("SELECT body FROM events ORDER BY seq")
         )
+
+    def _project(self) -> None:
+        state = project(self.events())
+        last_seq = self.db.execute("SELECT coalesce(max(seq),0) FROM events").fetchone()[0]
+        self.db.execute(
+            "INSERT INTO projection VALUES(1,?,?) ON CONFLICT(id) "
+            "DO UPDATE SET last_seq=excluded.last_seq,body=excluded.body",
+            (last_seq, json.dumps(state, sort_keys=True)),
+        )
+
+    def rebuild(self) -> None:
+        with self.transaction():
+            self._project()
+
+    def world(self, now: datetime) -> dict[str, Any]:
+        row = self.db.execute("SELECT body FROM projection WHERE id=1").fetchone()
+        return view(json.loads(row[0]), now)
+
+    def timeline(self) -> tuple[Event, ...]:
+        # Python's stable sort preserves ingest order for equal occurrence times.
+        return tuple(sorted(self.events(), key=lambda event: event.occurred_start))
 
     def status(self) -> dict[str, object]:
         return {

@@ -4,7 +4,7 @@ JANE is a proposed persistent cognitive system built around an LLM decision engi
 
 **End product:** A Python GTK desktop application for Linux, with a persistent engine and a CLI for development, diagnostics and automation. Local or hosted model inference is configurable.
 
-**Status:** Initial offline foundation (J01 and initial J02). J03 adds a SQLite journal and recovery queue. No live model, devices or GUI yet.
+**Status:** Initial offline foundation (J01 and initial J02). J03 adds a SQLite journal and recovery queue; J04 adds evidence-linked world/self projections, temporal views and prediction tracking. No live model, devices or GUI yet.
 
 ## Run the offline demo
 
@@ -55,3 +55,5 @@ jane journal drain jane.db
 ```
 
 Restart between commands; events and pending receipts survive. Reseeding does not duplicate them. See [storage semantics](docs/DEVELOPMENT.md#durable-journal-j03).
+
+Inspect temporal state with `jane journal world jane.db` and `jane journal timeline jane.db`. Rebuild derived state with `jane journal rebuild jane.db`.

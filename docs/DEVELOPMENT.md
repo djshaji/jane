@@ -52,3 +52,21 @@ The journal commits events, task projections, the acceptance checkpoint and outb
 Workers claim with a lease token and bounded attempt count (default three); expired leases recover on the next claim. Stale workers cannot settle reassigned work. Retry delays postpone eligibility; exhausted work becomes failed. These semantics are at-least-once delivery: future effectful workers require idempotency/reconciliation, not blind replay. Caller-supplied queue times are epoch seconds; production callers must use a consistent clock.
 
 Migration 1 creates events, outbox, task projection, checkpoint and reserved profile tables. Future schema versions are rejected without downgrade. Profiles have no activation API yet; full task lifecycle, world projections and the persistent cognitive coordinator remain J04 onward. Use the same attempt policy for all workers. Errors propagate and the CLI exits nonzero rather than acknowledging failed storage.
+
+## World and self projections (J04)
+
+Migration 2 derives a durable projection from retained events and leaves existing work-queue state intact. New `state.claim`, `state.self` and `state.prediction` variants use strict payloads. Claim evidence must already exist; observed/user-reported labels require the matching evidence class. Explicit corrections identify a prior claim for the same entity/predicate. Corrections retain original evidence and mark the earlier claim superseded. Invalid references roll back event acceptance, task/checkpoint changes and queued work together.
+
+```bash
+jane journal world jane.db
+jane journal timeline jane.db
+jane journal rebuild jane.db
+```
+
+World inspection includes entities, all claims with freshness/conflict flags, runtime self-status, episodes and predictions. Timeline orders by occurrence time with ingest-order ties; journal replay always uses ingest order. Episodes are grouped by task and correlation ID, with min/max occurrence bounds. Entity IDs are supplied explicitly; there is no visual identity matching.
+
+A mock observation creates a snapshot-only description. It is stale after its observation instant; explicit claims can supply a validity interval. Stale and conflicting evidence remains inspectable and does not manufacture a replacement fact. Self-status supports capability, source health, activity, pending action and commitment categories; values are reported runtime facts, not an implemented action/goal lifecycle. Newer occurrence time wins, with ingest-order tie breaking.
+
+Predictions initially match event kind, source, task and occurrence window against subsequently accepted events. They become supported when matching evidence is received, expired when the window passes without a match, or unresolved otherwise. Late matching evidence can update an expired interpretation to supported. Semantic contradiction, prediction cancellation and object-specific prediction predicates remain future extensions. Expiry is a derived query result, not a fabricated observation.
+
+`world(now)` is the latest retained interpretation with validity evaluated at `now`, not an as-of-history reconstruction. Rebuild deterministically replays the journal without enqueueing work. The initial implementation rebuilds projections on each acceptance inside the same transaction: simple and inspectable, but O(history length) per event. Incremental reducers/pagination are needed before large continuous sensor workloads. No model calls, automatic physical actions, affect updates or GUI are added here.
