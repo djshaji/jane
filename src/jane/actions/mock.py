@@ -20,3 +20,25 @@ class MockInspector:
             return self._observations[arguments.object_id]
         except KeyError:
             raise ValueError(f"unknown mock object: {arguments.object_id}") from None
+
+
+class RegisteredMockInspector(MockInspector):
+    """Registry wrapper for the original immutable read-only fixture tool."""
+
+    from jane.actions.registry import SPECS
+
+    spec = SPECS["mock.inspect"]
+
+    def execute(self, key: str, arguments: InspectArguments) -> Observation:
+        from jane.actions.registry import DefiniteFailure
+
+        try:
+            return self.inspect(arguments)
+        except ValueError as error:
+            raise DefiniteFailure(str(error)) from error
+
+    def reconcile(self, key: str, arguments: InspectArguments) -> Observation:
+        return self.execute(key, arguments)
+
+    def verify(self, key: str, arguments: InspectArguments, result: Observation) -> bool:
+        return self.inspect(arguments) == result

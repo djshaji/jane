@@ -52,7 +52,7 @@ class Journal:
             self.db.execute("PRAGMA synchronous=FULL")
             with self.transaction():
                 version = self.db.execute("PRAGMA user_version").fetchone()[0]
-                if version not in (0, 1, 2, 3, 4, 5):
+                if version not in (0, 1, 2, 3, 4, 5, 6):
                     raise ValueError(f"unsupported database version: {version}")
                 if version == 0:
                     for statement in DDL:
@@ -112,6 +112,39 @@ class Journal:
                         "WHERE status='active'"
                     )
                     self.db.execute("PRAGMA user_version=5")
+                if version < 6:
+                    self.db.execute(
+                        "CREATE TABLE actions(request INTEGER PRIMARY KEY "
+                        "REFERENCES cognitive_requests(id),"
+                        "task TEXT NOT NULL,generation INTEGER NOT NULL,tool TEXT NOT NULL,"
+                        "arguments TEXT NOT NULL,key TEXT UNIQUE NOT NULL,resource TEXT NOT NULL,"
+                        "version TEXT NOT NULL,status TEXT NOT NULL CHECK(status IN "
+                        "('prepared','running','succeeded','failed','unknown',"
+                        "'needs_review','cancelled')),"
+                        "attempts INTEGER NOT NULL,result TEXT,evidence TEXT UNIQUE)"
+                    )
+                    self.db.execute(
+                        "CREATE UNIQUE INDEX action_resource_lock ON actions(resource) "
+                        "WHERE status IN ('prepared','running','unknown','needs_review')"
+                    )
+                    self.db.execute(
+                        "CREATE TABLE action_changes(seq INTEGER PRIMARY KEY,"
+                        "request INTEGER NOT NULL "
+                        "REFERENCES actions(request),at TEXT NOT NULL,"
+                        "status TEXT NOT NULL,reason TEXT NOT NULL)"
+                    )
+                    self.db.execute(
+                        "CREATE TABLE executions(request INTEGER PRIMARY KEY "
+                        "REFERENCES cognitive_requests(id),"
+                        "status TEXT NOT NULL)"
+                    )
+                    self.db.execute(
+                        "CREATE TABLE runtime_control(id INTEGER PRIMARY KEY CHECK(id=1),"
+                        "paused INTEGER NOT NULL,stopped INTEGER NOT NULL,"
+                        "generation INTEGER NOT NULL)"
+                    )
+                    self.db.execute("INSERT INTO runtime_control VALUES(1,0,0,0)")
+                    self.db.execute("PRAGMA user_version=6")
         except BaseException:
             self.db.close()
             raise

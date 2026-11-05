@@ -245,3 +245,89 @@ request status. Journal transactions now support nested SQLite savepoints for th
 A storage failure propagates and leaves unfinished work for explicit startup recovery;
 it does not acknowledge an accepted proposal. Formatting-repair prompts currently expose a
 boolean repair flag to the offline adapter; real provider instructions are J09 work.
+
+## Durable actions and full offline loop (J08)
+
+```bash
+jane offline submit jane.db --text "Inspect the simulated cup" --object cup
+jane offline run jane.db
+jane offline status jane.db
+jane offline timeline jane.db
+jane offline pause jane.db
+jane offline resume jane.db
+jane offline stop jane.db
+```
+
+These commands now run an offline application loop, not just proposal validation. `submit`
+records the text and creates a scoped inspection goal with an explicit target object.
+The adapter is a deterministic inspection policy: it does **not** understand arbitrary
+natural-language requests or call an LLM. `--object` declares the simulated object to inspect.
+`run` executes at most eight loop steps by default (`--max-steps` accepts 1–32); the persistent
+J07 call limit also applies. Submission does not automatically run work. `status` shows
+persistent goals/actions/control state. `timeline` includes accepted events and the separate
+action transition audit. Responses are durable `communication.response` records visible
+there; no network, microphone, speaker, camera or GUI is used.
+
+The first new simulator starts with fail, fail, succeed. The third inspection uses the
+recovery template. Verified evidence then supports a response and explicit goal completion.
+A second process can inspect the same completed goal without re-executing it. Simulator
+attempt position persists: subsequent inspections succeed by default. `jane demo` and
+`jane coordinator-demo` retain their original deterministic fixture/proposal meanings.
+
+Migration 6 adds action intents, lifecycle audit, applied-decision receipts and persisted
+pause/stop controls. Intents reference accepted cognitive requests and store a unique
+idempotency key, argument payload, task generation, resource key and relevant-state hash.
+Preparation validates scope and permissions and atomically reserves one tool-budget step.
+Redispatch of an already prepared/completed request does not reserve again. A reservation
+cancelled before dispatch remains consumed conservatively. Definite-failure retries reserve
+another step and reuse the key; they are limited to three dispatch attempts and the goal's
+remaining budget. Verified goals may respond/finish after their tool budget is exhausted,
+with an empty available-tool list and no extra tool authorization.
+
+Registered contracts cover `mock.inspect` (immutable read-only fixtures) and `sim.inspect`
+(a local stateful simulator). Both declare argument/result schemas, permission name,
+resource key, effect class, idempotency and reconciliation strategy. The registry rejects
+unknown/changed contracts; it does not import arbitrary code from model output. A unique
+partial index holds a resource while its action is prepared, running, unknown or needs review.
+Dispatch rechecks generation, selected goal, permissions, runtime controls and the read set.
+Intent/running status commits **before** calling the tool, outside any journal transaction.
+A successful call is not sufficient: the tool's direct postcondition must verify its result
+before the observation and succeeded status are committed together.
+
+The simulator has a separate durable database, `jane.db.sim.db`, representing external
+state that cannot commit atomically with JANE's journal. Keep both files for restart tests.
+Its Python API accepts modes `succeed`, `fail`, `timeout`, `timeout_after_effect`, `crash`
+and `unknown`. It records receipts and unique-key effects; postcondition checks compare
+the receipt, effect entry, requested object and returned observation. `crash` raises a
+special BaseException after committing the external effect, deliberately bypassing normal
+runtime error handling. No real external system is modified.
+
+Exclusive startup reconciles running/unknown actions. Confirmed success records the real
+result once; confirmed no-effect becomes failed; ambiguity becomes needs_review and retains
+the resource lock. **Unknown effects are never blindly retried**, even for these idempotent
+tools. `Executor.reconcile(request)` can recheck needs_review after external evidence changes;
+there is no unsafe force-success or unlock command. Human resolution UI is later work.
+`Executor.dispatch(request, retry=True)` only retries prepared/definitely failed work within
+its bounds. The CLI normally makes fresh proposals after definite failures, which lets the
+next snapshot show changed failures and the recovery template. It stops on unknown/review
+outcomes. Prepared intents and accepted-but-unapplied proposals can resume after restart;
+stale proposals are rejected rather than repeatedly attempted.
+
+Goal completion is separate from tool success: `finish` must cite a succeeded action's
+observation for the same task, generation and explicit target object. A fixture-injected
+observation alone cannot complete an executable goal. `respond`, `wait` and `fail` now have
+idempotent durable lifecycle applications. Waiting stores a timer; a later explicit `run`
+reviews it. There is no continuously running scheduler.
+
+Pause prevents further dispatch/submission; resume permits work again. Every control change
+advances a version, invalidating older prepared snapshots. Stop cancels nonterminal goals
+and prepared actions; resume does not revive cancelled goals. Effects already committed
+cannot be undone: if a tool completes after cancellation, JANE records its actual outcome
+without completing the cancelled goal or executing more of its plan.
+
+The runtime requires one application owner and short synchronous offline tools. Do not run
+multiple `run` processes simultaneously or call startup recovery against an active worker.
+Cross-process leadership, interruptible real tools and hard process-isolated timeouts remain
+future work. Unknown outcomes deliberately block the offline loop pending reconciliation.
+Simulator timeout modes model ambiguous outcomes; they are not a production deadline runner.
+There is no universal exactly-once claim across arbitrary external systems.

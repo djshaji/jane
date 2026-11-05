@@ -216,12 +216,14 @@ class AffectTests(unittest.TestCase):
             "affect_seen",
         ):
             self.j.db.execute(f"DROP TABLE {table}")
+        for table in ("action_changes", "actions", "executions", "runtime_control"):
+            self.j.db.execute(f"DROP TABLE {table}")
         self.j.db.execute("DROP TABLE cognitive_requests")
         self.j.db.execute("PRAGMA user_version=3")
         self.j.close()
         self.j = Journal(self.path)
         self.a = Affect(self.j)
-        self.assertEqual(self.j.status()["schema_version"], 5)
+        self.assertEqual(self.j.status()["schema_version"], 6)
         self.assertEqual(len(self.j.events()), 1)
         self.assertEqual(self.a.history(), [])
         self.j.accept(self.event)

@@ -16,6 +16,7 @@ Terminal = {"completed", "cancelled", "failed"}
 class Goal(Contract):
     goal_id: Identifier
     description: Text
+    target_object_id: Identifier | None = None
     scope: Annotated[tuple[Identifier, ...], Field(min_length=1)]
     success_event_kind: Literal["tool.observation", "communication.response"]
     created_at: AwareDatetime
@@ -222,11 +223,20 @@ class Goals:
                             | {"status": "pending", "wake_at": None, "wake_source": None}
                         )
                         self._save(goal, now, "woke")
+                # Finishing an already verified goal requires no further tool budget.
+                can_finish = goal.target_object_id is not None and any(
+                    json.loads(row[0])["object_id"] == goal.target_object_id
+                    for row in self.journal.db.execute(
+                        "SELECT result FROM actions WHERE task=? AND generation=? "
+                        "AND status='succeeded'",
+                        (goal.goal_id, goal.generation),
+                    )
+                )
                 eligible = (
                     goal.status in {"pending", "active"}
                     and goal.created_at <= now
                     and set(goal.dependencies) <= completed
-                    and goal.spent < goal.budget
+                    and (goal.spent < goal.budget or can_finish)
                     and set(goal.scope) <= set(allowed_tools)
                 )
                 age = min(0.3, max(0.0, (now - goal.created_at).total_seconds() / 3600) * 0.05)

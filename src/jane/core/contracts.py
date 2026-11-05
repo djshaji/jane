@@ -40,7 +40,7 @@ class Respond(DecisionBase):
 class ToolCall(DecisionBase):
     type: Literal["call_tool"]
     # Initial registry deliberately contains only this read-only tool.
-    tool: Literal["mock.inspect"]
+    tool: Literal["mock.inspect", "sim.inspect"]
     arguments: "InspectArguments"
 
 
