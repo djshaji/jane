@@ -57,3 +57,7 @@ jane journal drain jane.db
 Restart between commands; events and pending receipts survive. Reseeding does not duplicate them. See [storage semantics](docs/DEVELOPMENT.md#durable-journal-j03).
 
 Inspect temporal state with `jane journal world jane.db` and `jane journal timeline jane.db`. Rebuild derived state with `jane journal rebuild jane.db`.
+
+## Goals and drives
+
+J05 adds persistent goals, budgets, dependency checks, waiting/wakeup rules and deterministic drive review. Use `jane goals --help`; see [goal setup](docs/DEVELOPMENT.md#persistent-goals-and-drive-review-j05). Review selects work without invoking a model or dispatching tools.

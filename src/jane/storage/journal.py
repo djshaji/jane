@@ -51,7 +51,7 @@ class Journal:
             self.db.execute("PRAGMA synchronous=FULL")
             with self.transaction():
                 version = self.db.execute("PRAGMA user_version").fetchone()[0]
-                if version not in (0, 1, 2):
+                if version not in (0, 1, 2, 3):
                     raise ValueError(f"unsupported database version: {version}")
                 if version == 0:
                     for statement in DDL:
@@ -64,6 +64,25 @@ class Journal:
                     )
                     self._project()
                     self.db.execute("PRAGMA user_version=2")
+                if version < 3:
+                    self.db.execute(
+                        "CREATE TABLE goals(goal_id TEXT PRIMARY KEY,body TEXT NOT NULL)"
+                    )
+                    self.db.execute(
+                        "CREATE TABLE goal_changes(seq INTEGER PRIMARY KEY,goal_id TEXT NOT NULL,"
+                        "at TEXT NOT NULL,reason TEXT NOT NULL,body TEXT NOT NULL)"
+                    )
+                    self.db.execute(
+                        "CREATE TABLE drives(goal_id TEXT PRIMARY KEY REFERENCES goals(goal_id),"
+                        "drive TEXT NOT NULL,urgency REAL NOT NULL,evaluated_at TEXT NOT NULL,"
+                        "next_review TEXT NOT NULL)"
+                    )
+                    self.db.execute(
+                        "CREATE TABLE arbitration(id INTEGER PRIMARY KEY CHECK(id=1),"
+                        "selected TEXT,selected_at TEXT NOT NULL,reviewed_at TEXT NOT NULL,"
+                        "body TEXT NOT NULL,profile TEXT NOT NULL)"
+                    )
+                    self.db.execute("PRAGMA user_version=3")
         except BaseException:
             self.db.close()
             raise
