@@ -61,3 +61,9 @@ Inspect temporal state with `jane journal world jane.db` and `jane journal timel
 ## Goals and drives
 
 J05 adds persistent goals, budgets, dependency checks, waiting/wakeup rules and deterministic drive review. Use `jane goals --help`; see [goal setup](docs/DEVELOPMENT.md#persistent-goals-and-drive-review-j05). Review selects work without invoking a model or dispatching tools.
+
+J06 adds deterministic simulated affect: evidence-linked progress/failure/novelty rules,
+elapsed-time recovery, repetition caps and bounded modulation of goal review. Inspect it
+with `jane affect status jane.db` and `jane affect history jane.db`. Configuration, recovery
+and operator reset are documented in [developer setup](docs/DEVELOPMENT.md#appraisal-and-simulated-affect-j06).
+The offline demo remains deterministic; the persistent cognitive coordinator is next (J07).

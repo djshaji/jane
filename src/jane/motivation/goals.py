@@ -6,6 +6,7 @@ from typing import Annotated, Literal
 
 from pydantic import AwareDatetime, Field
 
+from jane.affect.engine import Affect
 from jane.core.contracts import EVENT, Contract, Identifier, Text
 from jane.storage.journal import Journal
 
@@ -71,9 +72,14 @@ class Goals:
             "INSERT INTO goals VALUES(?,?) ON CONFLICT(goal_id) DO UPDATE SET body=excluded.body",
             (goal.goal_id, body),
         )
-        self.journal.db.execute(
+        cursor = self.journal.db.execute(
             "INSERT INTO goal_changes(goal_id,at,reason,body) VALUES(?,?,?,?)",
             (goal.goal_id, now.isoformat(), reason, body),
+        )
+
+        assert cursor.lastrowid is not None
+        Affect(self.journal).goal_change(
+            cursor.lastrowid, goal.model_dump(mode="json"), now, reason
         )
 
     def add(self, goal: Goal) -> None:
@@ -283,6 +289,15 @@ class Goals:
                 "next_review": (now + timedelta(seconds=5)).isoformat(),
                 "optional_observations": min(3, int(profile.curiosity * 3)) if selected else 0,
             }
+            report.update(
+                Affect(self.journal).influence(
+                    now,
+                    int(profile.curiosity * 3),
+                    self.get(selected).budget - self.get(selected).spent if selected else 0,
+                    template,
+                    selected is not None,
+                )
+            )
             selected_at = (
                 old["selected_at"] if old and old["selected"] == selected else now.isoformat()
             )
