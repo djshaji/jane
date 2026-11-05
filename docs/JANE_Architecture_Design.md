@@ -1,7 +1,7 @@
 # JANE: Just Another Neural Engine
 ## Detailed architecture design
 
-**Version:** 1.0 — proposed implementation baseline  
+**Version:** 1.1 — proposed implementation baseline  
 **Date:** 5 November 2026  
 **Source:** Refined Roadmap-v2.md and the accompanying design discussion  
 **Status:** Architecture specification; no implementation or performance results are claimed.
@@ -16,7 +16,7 @@ The central cycle is:
 
 **Observe → interpret → update timeline, world and affect → evaluate drives → select goal → decide → execute → verify.**
 
-The initial deployment is a single-user Python application with a single authoritative state writer, asynchronous I/O, SQLite persistence and local media storage. Model providers, transcription, speech synthesis and sensors are accessed through adapters. This document defines proposed application contracts rather than provider-specific API guarantees.
+The core prototype is a single-user Python engine with a single authoritative state writer, asynchronous I/O, SQLite persistence and local media storage. The desktop product adds a separate Python GTK frontend connected through local IPC; the engine remains independent of GTK. Model providers, transcription, speech synthesis and sensors are accessed through adapters. This document defines proposed application contracts rather than provider-specific API guarantees.
 
 ## Contents
 
@@ -54,7 +54,7 @@ The system shall support user-defined drives, inclinations and behaviour templat
 | Area | Baseline decision |
 | --- | --- |
 | Users | One operator and one active profile |
-| Runtime | Python application on one host; desktop UI optional |
+| Runtime | Python engine and GTK desktop frontend on one Linux host; CLI retained |
 | Input mode | Push-to-talk and on-demand camera; monitoring opt-in |
 | Cognition | One active decision turn; one selected goal at a time |
 | Storage | SQLite for structured state; files for retained media |
@@ -588,7 +588,9 @@ Backups must capture a consistent database snapshot and the referenced retained 
 
 ## 14. Application interfaces and operator controls
 
-V1 can use an in-process command interface or local IPC. An HTTP/WebSocket layer is optional; if added, bind locally by default and authenticate state-changing commands.
+The end product uses a Python GTK frontend with local IPC to the authoritative engine. The CLI uses the same command/query contracts. Select the GTK major version during the supported-distribution compatibility spike. The GUI never writes the state database or calls models directly. Keep toolkit updates on the GUI main loop and expensive work in the engine/workers. A network interface is outside the initial scope.
+
+Default window close shuts down the engine and capture. Explicit background mode permits continued configured work only with a visible, accessible status/stop mechanism on the supported desktop. Pause, stop-all, close and quit have distinct semantics. Frontend disconnect leases stop default-session capture after a GUI crash; background mode is separately configured. Reopening reconnects without duplicate engines or commands. See G01–G06 in [the implementation plan](IMPLEMENTATION_PLAN.md) for screens, lifecycle, packaging and acceptance requirements.
 
 | Command/query | Purpose |
 | --- | --- |
@@ -727,7 +729,8 @@ Validate profiles before activation; reject unknown rules, invalid bounds or uns
 | `jane/actions/` | Tool registry, validation, execution and reconciliation |
 | `jane/memory/` | Retrieval, consolidation, retention and deletion |
 | `jane/storage/` | Repositories, transactions, migrations and media assets |
-| `jane/interface/` | CLI/IPC and optional desktop presentation |
+| `jane/interface/` | Shared client contracts, CLI and local IPC |
+| `jane/desktop/` | GTK views, presentation state and desktop lifecycle controls |
 | `jane/observability/` | Traces, metrics and redaction |
 | `tests/scenarios/` | Recorded event sequences and expected invariants |
 | `tests/integration/` | Device/model/tool adapter integration |
@@ -755,7 +758,7 @@ Open decisions before implementation:
 - Hosted versus local inference and permitted outbound data.
 - First three concrete tasks and exact success predicates.
 - Initial model, transcription and speech adapters after capability verification.
-- Whether the first interface is CLI, GTK or another desktop environment.
+- Supported Linux distribution, GTK major version and packaging path; the product interface is GTK, with CLI retained for development/automation.
 - Retention periods, storage allowance and inference budget.
 - Initial disposition values and whether configured exploration is enabled.
 
@@ -800,6 +803,9 @@ If the operator cancels while the model is reasoning, the task generation advanc
 ## 20. Acceptance checklist
 
 The first useful implementation is complete when it can:
+
+- Launch as an installable Python GTK desktop application with responsive conversation and inspection views.
+- Apply explicit default-close, background, stop-all and quit behaviour without duplicate engine sessions.
 
 - Acquire a user request and fresh image, construct context and return a grounded answer.
 - Maintain a visible timeline distinguishing observations, interpretations, decisions and outcomes.
