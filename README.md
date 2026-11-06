@@ -86,3 +86,14 @@ goal. Restart preserves completion. Action intents, bounded retries, crash recon
 resource locks and pause/resume/stop controls are documented in
 [developer setup](docs/DEVELOPMENT.md#durable-actions-and-full-offline-loop-j08).
 This uses a scripted policy and local simulator; J09 adds a real model provider.
+
+J09 adds optional live text decisions through OpenAI's Responses API (`gpt-6.1-sol`).
+Install `.[openai]`, configure `OPENAI_API_KEY`, submit with `jane live submit`, then opt in
+with `jane live run jane.db --enable-live`. Calls remain budgeted and actions stay within
+the local simulator. See [provider setup and test limits](docs/DEVELOPMENT.md#first-live-text-provider-j09).
+
+J10's initial voice path adds explicit push-to-talk capture, a final transcript preview,
+confirmed task submission, and interruptible local speech. Install `.[voice]` plus PortAudio
+and eSpeak NG, then run `jane voice devices` and
+`jane voice session --enable-microphone --enable-live`. The task still inspects a simulated
+object. See [voice setup and hardware acceptance](docs/DEVELOPMENT.md#push-to-talk-voice-j10).

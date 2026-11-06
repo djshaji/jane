@@ -1,13 +1,14 @@
 """Explicit bounded offline application loop with a deterministic policy adapter."""
 
 import json
+from datetime import datetime
 from pathlib import Path
 
 from jane.actions.executor import Executor
 from jane.actions.registry import Registry
 from jane.actions.simulated import SimulatedInspector
 from jane.cognition.context import Snapshot
-from jane.cognition.coordinator import Coordinator
+from jane.cognition.coordinator import Adapter, Coordinator, Limits
 from jane.core.clock import Clock
 from jane.core.contracts import Message, UserEvent
 from jane.motivation.goals import Goal, Goals
@@ -58,13 +59,17 @@ class OfflineRuntime:
         simulator_path: Path,
         clock: Clock,
         modes: tuple[str, ...] = ("fail", "fail", "succeed"),
+        adapter: Adapter | None = None,
+        limits: Limits | None = None,
     ) -> None:
         self.j = journal
         self.clock = clock
         self.simulator = SimulatedInspector(simulator_path, modes)
         self.registry = Registry((self.simulator,))
         self.executor = Executor(journal, clock, self.registry, self.registry.names)
-        self.coordinator = Coordinator(journal, clock, InspectionPolicy(), self.registry.names)
+        self.coordinator = Coordinator(
+            journal, clock, adapter or InspectionPolicy(), self.registry.names, limits
+        )
 
     def close(self) -> None:
         self.simulator.close()
@@ -73,7 +78,16 @@ class OfflineRuntime:
         self.coordinator.startup()
         self.executor.recover()
 
-    def submit(self, text: str, object_id: str) -> str:
+    def submit(
+        self,
+        text: str,
+        object_id: str,
+        *,
+        source_id: str = "cli",
+        source_event_id: str | None = None,
+        occurred_start: datetime | None = None,
+        occurred_end: datetime | None = None,
+    ) -> str:
         with self.j.transaction():
             if any(
                 self.j.db.execute(
@@ -102,9 +116,10 @@ class OfflineRuntime:
                     event_id=f"input-{task}",
                     task_id=task,
                     correlation_id=f"turn-{task}",
-                    source_id="cli",
-                    occurred_start=now,
-                    occurred_end=now,
+                    source_id=source_id,
+                    source_event_id=source_event_id,
+                    occurred_start=occurred_start or now,
+                    occurred_end=occurred_end or now,
                     received_at=now,
                     kind="user.message",
                     provenance_class="user_statement",

@@ -331,3 +331,183 @@ Cross-process leadership, interruptible real tools and hard process-isolated tim
 future work. Unknown outcomes deliberately block the offline loop pending reconciliation.
 Simulator timeout modes model ambiguous outcomes; they are not a production deadline runner.
 There is no universal exactly-once claim across arbitrary external systems.
+
+## First live text provider (J09)
+
+J09 adds an optional OpenAI Responses adapter for `gpt-6.1-sol`, default reasoning `medium`.
+The supported model/capability profile is explicit: text input, structured decision output,
+no media, hosted tools or arbitrary provider endpoints. Unsupported models/modalities fail
+configuration validation. The provider is interchangeable with the scripted adapter; the
+same J07 decision checks and J08 execution/postcondition checks remain authoritative.
+Only the local simulated inspection tool is exposed by this first live CLI.
+
+Official documentation checked on 6 November 2026:
+
+- [Model capabilities and reasoning settings](https://developers.openai.com/api/docs/models/gpt-6.1-sol)
+- [Structured output schema rules](https://developers.openai.com/api/docs/guides/structured-outputs)
+- [Responses API](https://developers.openai.com/api/docs/guides/responses)
+
+The model page publishes an alias rather than a dated snapshot. Requests record the exact
+requested alias, settings and returned model identifier; this does not guarantee unchanged
+behaviour if the alias changes. Structured output uses an object envelope containing the
+canonical decision union as nested `anyOf`. Provider schema conversion removes unsupported
+annotation/discriminator forms; strict internal Pydantic validation still runs afterward.
+The model only proposes decisions. No hosted tool is configured or executed by OpenAI.
+
+```bash
+python -m pip install -e '.[openai]'
+# Supply OPENAI_API_KEY through your local environment or secret manager.
+# Do not put the key in a goal file, command argument, committed file or database.
+jane live submit jane.db --text "Inspect the simulated cup and report what you observe" --object cup
+jane live run jane.db --enable-live --max-calls 8 --max-output-tokens 4096 --reasoning medium
+jane live status jane.db
+jane live timeline jane.db
+```
+
+Only `live run --enable-live` invokes inference. `live submit/status/timeline/pause/resume/stop`
+use the same local commands as offline mode. The explicit run flag acknowledges that the
+snapshot's task text and evidence will be sent to OpenAI and may incur API charges.
+`OPENAI_API_KEY` is required; missing credentials fail before opening/mutating a database.
+There is no fallback to a different model or offline policy after a provider failure.
+Install HTTPX SOCKS support separately if your configured proxy requires it; normal proxy
+and CA environment configuration is preserved. Redirects are disabled and the endpoint
+is fixed to `https://api.openai.com/v1/responses`.
+
+The adapter performs one HTTP attempt per `decide`. The coordinator permits at most one
+retry for 429 or selected 5xx errors by default (configurable 0–2); each counts against the
+same durable interaction call limit, including across restarts. It waits a bounded second
+between attempts. A malformed response permits at most one formatting repair. Authentication,
+refusal, incomplete output, timeout and ambiguous network failures are not automatically
+retried. All failures become typed error events and leave the goal recoverable. Timeout or
+cancellation aborts the local HTTP request and fences any late result; it cannot guarantee
+that remote processing or billing has stopped. Stop/pause controls still prevent stale
+results from dispatching actions, including when inference has already begun.
+
+Each call sets `max_output_tokens` (default 4096, configurable 256–8192), including reasoning
+usage. The coordinator defaults to eight total calls per interaction. Input snapshot limits
+remain byte-based; the provider adds a full request-body byte limit including instructions
+and schema. HTTP responses are streamed into a capped 1 MiB buffer and decision text retains
+the snapshot's byte limit. These are bounds, not an exact monetary budget or token estimate.
+An incomplete response can require an explicit configuration change before retrying.
+
+Migration 7 adds `provider_attempts`. Before each provider attempt, the runtime persists the
+model/settings; after it returns, it records HTTP status and API-reported input/output/total
+tokens when available. Generated decision fields cannot supply usage. Cancelled requests,
+transport failures and crashes may have unknown usage (`null`); do not count that as zero
+cost. Runtime call reservations survive even if the process dies before HTTP dispatch.
+The core request table continues to measure calls, output bytes and injected-clock elapsed
+time. No price estimate or hidden SDK retry is used.
+
+Credentials exist only in the transport Authorization header, never in snapshots or audit
+rows. Provider error bodies, refusal wording and raw exceptions are discarded; audit rows
+contain only whitelisted metadata. The normal journal still stores user evidence and
+accepted decisions under the existing J07 policy. Requests use `store=false`; this is an API
+storage setting, not a claim about the provider's broader retention policies.
+
+Tests use fake transports and HTTPX MockTransport: schema conversion, rate limits, retry
+budgets, malformed output/repair, timeout, cancellation, refusal, incomplete response,
+unsupported modality, usage spoofing, request size and sanitized HTTP errors. A fake
+provider also completes the full existing inspection loop without network access.
+
+The real contract test is **opt-in and paid**, with a maximum of one model request and no
+action execution:
+
+```bash
+JANE_LIVE_TEST=1 python -m unittest discover -s tests -p test_provider.py -v
+```
+
+It additionally requires `OPENAI_API_KEY` and the optional dependency. Default CI never
+sets this flag or needs a key. This implementation session had no configured API key, so
+live model availability, schema acceptance and real task quality remain unverified; run the
+opt-in test before enabling the adapter for regular use. Audio/camera input, semantic goal
+creation, general-purpose real tools and GUI remain outside J09's text inspection scope.
+
+## Push-to-talk voice (J10)
+
+This first voice slice targets Linux terminals. It adds microphone → transcription →
+reviewed text → the existing bounded cognitive/execution loop → local synthesized speech.
+It does not add general-purpose goal interpretation, real tools, camera input or a GUI.
+Use one process and a dedicated database; unfinished existing goals must be resolved before
+another voice task can be sent. `--object` selects the simulated object, not a visual target.
+
+Install the distribution's PortAudio runtime and `espeak-ng` system packages (on Debian/
+Ubuntu these are normally `libportaudio2` and `espeak-ng`), then:
+
+```bash
+python -m pip install --no-build-isolation -e '.[voice]'
+# Configure OPENAI_API_KEY in your environment, without committing it.
+jane voice devices
+jane voice session --database jane-voice.db --device 0 --object cup \
+  --enable-microphone --enable-live
+```
+
+Omit `--device` for the default input. Discovery never starts capture. Neither import nor
+installation opens a microphone. Both enable flags are required before a session starts;
+each recording additionally requires the `record` command. Speech is AI-generated and
+uses the system's default output device through eSpeak NG. No hosted synthesis API is used.
+
+Terminal commands (type each and press Enter):
+
+1. `record`: begin a new utterance. Speak for less than 15 seconds.
+2. `release`: close the input stream and start transcription asynchronously.
+3. `status`: inspect progress; when state is `preview`, review the final transcript.
+4. `send`: explicitly accept that transcript and run the inspection task.
+5. `stop`: cancel the turn, clear the preview, close capture and terminate speech output.
+6. `quit` or EOF: perform the same cleanup and exit.
+
+This is a two-command push-to-talk boundary, not raw keyboard key-down/key-up capture.
+There is no always-listening wake word or acoustic echo cancellation. `record` is rejected
+while transcribing, previewing, thinking or speaking; use `stop` to discard the old turn.
+Partial transcripts are presentation-only and generation-fenced. The current HTTP adapter
+returns finals only. A final is never actionable until `send`. Noise can fool any ASR model;
+the preview confirmation is required even when quality checks pass.
+
+Capture is mono PCM16 at 16 kHz, with a 480,000-byte (15 second) hard buffer cap. Overflow,
+PortAudio callback errors, inactive/disconnected devices, very short recordings, low RMS
+silence and heavily clipped input reject the entire utterance. Nothing silently truncates a
+command. Unsupported device sample rates fail visibly. Reconnect, select a working device
+(or restart with another `--device`) and record again. Raw PCM and WAV exist only in memory;
+the buffer is cleared on release/abort and the WAV is dropped after transcription or
+cancellation. No audio file is written. An in-flight adapter can retain bytes until its
+request returns/cancels; this is reference release, not guaranteed secure memory erasure.
+
+The hosted transcriber uses [OpenAI's speech-to-text API](https://developers.openai.com/api/docs/guides/speech-to-text),
+`gpt-transcribe`, WAV multipart uploads, a 30-second HTTP timeout and a 32 KiB response cap.
+There are no redirects, hidden retries or model fallbacks. Empty text or an unidentified
+language fails closed. Each release makes at most one transcription request; repeated
+recordings are new paid requests. Audio and transcripts leave the machine, and cancellation
+does not guarantee remote processing/billing stops. The existing J09 per-interaction
+cognitive budgets still apply. Transcription usage/cost is not yet durably metered.
+
+Accepted speech is a canonical `user.message` with source `microphone`, a unique capture
+association and capture start/end timestamps. It enters the existing journal/goal transaction;
+partial or rejected transcripts do not. The transcript, goal, evidence and decisions remain
+in SQLite under the normal retention policy. Quality (duration, RMS, clipped fraction),
+device/transcription failures and stop timings are kept in a bounded 64-record session audit
+and shown by `status`; these diagnostics are not yet persisted across process exits.
+
+Stop advances the session generation immediately and cancels the coordinator/current goal.
+It then terminates the eSpeak NG child independently of inference, escalating to kill after
+0.5 seconds if needed. Process creation is cancellation-safe; an old task cannot terminate a
+new utterance. Metrics distinguish `ack_seconds` from `playback_process_stop_seconds`.
+**Process exit is not acoustic silence**: output-device/server buffers can still drain. Do
+not report these numbers as measured physical playback-stop latency.
+
+Offline tests use synthetic PCM, fake devices, a fake speaker, fake time, real SQLite and
+HTTPX MockTransport. They cover overflow, clipping, silence, unplug/retry, confirmation,
+partial/final fencing, echo gating, late inference suppression, subprocess spawn races and
+kill escalation. CI does not install or activate audio hardware and never calls a live API.
+
+Hardware/provider release gate still pending (no microphone, eSpeak NG or API key available
+in the implementation environment):
+
+- Record a clear request, review it, send it and hear the verified simulated response.
+- Try silence and unintelligible noise; discard inaccurate previews rather than sending them.
+- Exceed 15 seconds and confirm rejection; unplug during capture and verify reconnect/retry.
+- Interrupt during transcription, inference and speech; verify no late task or speech starts.
+- Measure acknowledgment, process termination and actual audible-stop latency separately
+  using an external recorder/loopback. Confirm no playback is captured after a stop/restart.
+
+Live acoustic validation, durable audio diagnostics/usage, streamed partial transcription,
+and desktop push-to-talk controls remain follow-up work. This slice does not claim the full
+J10/M3 hardware acceptance gate has passed.
