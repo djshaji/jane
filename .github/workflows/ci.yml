@@ -25,6 +25,7 @@ jobs:
           /tmp/jane-wheel/bin/pip install dist/*.whl
           cd /tmp
           /tmp/jane-wheel/bin/jane --help
+          /tmp/jane-wheel/bin/jane voice --help
           /tmp/jane-wheel/bin/jane demo > jane-first.json
           /tmp/jane-wheel/bin/jane demo > jane-second.json
           cmp jane-first.json jane-second.json

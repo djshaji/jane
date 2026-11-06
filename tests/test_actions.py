@@ -288,11 +288,12 @@ class ActionTests(unittest.IsolatedAsyncioTestCase):
         request = await self.propose()
         for table in ("action_changes", "actions", "executions", "runtime_control"):
             self.j.db.execute(f"DROP TABLE {table}")
+        self.j.db.execute("DROP TABLE provider_attempts")
         self.j.db.execute("PRAGMA user_version=5")
         self.j.close()
         self.j = Journal(self.path)
         self.goals = Goals(self.j)
-        self.assertEqual(self.j.status()["schema_version"], 6)
+        self.assertEqual(self.j.status()["schema_version"], 7)
         # Runtime-control defaults are preserved when migrating a v5-shaped database.
         self.assertEqual(
             self.j.db.execute(
