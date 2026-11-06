@@ -111,7 +111,7 @@ def build_snapshot(
     )
     # The latest authorized user instruction and observation are essential, even if large.
     essential_ids = set()
-    for kind in ("user.message", "tool.observation"):
+    for kind in ("user.message", "tool.observation", "sensor.image"):
         last = next((e for e in reversed(events) if e.kind == kind), None)
         if last:
             essential_ids.add(last.event_id)

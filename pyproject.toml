@@ -15,8 +15,9 @@ jane = "jane.cli:main"
 
 [project.optional-dependencies]
 openai = ["httpx==0.28.1"]
+camera = ["Pillow==12.0.0", "opencv-python-headless==4.12.0.88"]
 voice = ["httpx==0.28.1", "sounddevice==0.5.5"]
-dev = ["ruff==0.14.3", "mypy==1.18.2", "build==1.3.0", "httpx==0.28.1"]
+dev = ["ruff==0.14.3", "mypy==1.18.2", "build==1.3.0", "httpx==0.28.1", "Pillow==12.0.0"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
