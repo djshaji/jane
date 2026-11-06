@@ -7,8 +7,9 @@ from typing import Annotated, Any
 
 from pydantic import AwareDatetime, Field
 
+from jane.actions.registry import SPECS
 from jane.affect.engine import Affect
-from jane.core.contracts import Contract, Event, Identifier, InspectArguments
+from jane.core.contracts import Contract, Event, Identifier, InspectArguments, Observation
 from jane.motivation.goals import Goal, Goals
 from jane.storage.journal import Journal
 
@@ -77,6 +78,9 @@ def relevant(journal: Journal, goal: Goal, now: datetime) -> dict[str, Any]:
     }
     arbitration = journal.db.execute("SELECT profile FROM arbitration WHERE id=1").fetchone()
     return {
+        "runtime_generation": journal.db.execute(
+            "SELECT generation FROM runtime_control WHERE id=1"
+        ).fetchone()[0],
         "profile": arbitration[0] if arbitration else "{}",
         "goal": goal.model_dump(mode="json"),
         "world": world,
@@ -117,7 +121,11 @@ def build_snapshot(
     drives = [
         dict(r) for r in journal.db.execute("SELECT * FROM drives WHERE goal_id=?", (goal.goal_id,))
     ]
-    tools = tuple(sorted(set(goal.scope) & set(allowed_tools) & {"mock.inspect"}))
+    tools = (
+        tuple(sorted(set(goal.scope) & set(allowed_tools) & set(SPECS)))
+        if goal.spent < goal.budget
+        else ()
+    )
     snapshot = Snapshot(
         request_id=request_id,
         snapshot_id="snapshot-" + request_id,
@@ -130,7 +138,16 @@ def build_snapshot(
         drives_json=canonical(drives),
         affect_json=canonical(Affect(journal).state(now)),
         profile_json=row[1] if row else "{}",
-        tool_schemas_json=canonical({t: InspectArguments.model_json_schema() for t in tools}),
+        tool_schemas_json=canonical(
+            {
+                t: {
+                    "contract": SPECS[t].model_dump(mode="json"),
+                    "arguments": InspectArguments.model_json_schema(),
+                    "result": Observation.model_json_schema(),
+                }
+                for t in tools
+            }
+        ),
         template=report.get("template", "continue"),
         available_tools=tools,
         remaining_steps=goal.budget - goal.spent,

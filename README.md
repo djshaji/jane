@@ -72,3 +72,17 @@ J07 adds immutable bounded contexts and an async cognitive coordinator with canc
 stale-result rejection, persistent call budgets and typed errors. Run `jane coordinator-demo`
 for a deterministic proposal pipeline. It uses fixture evidence; action dispatch and
 lifecycle execution remain J08.
+
+J08 connects proposals to durable offline execution. Try:
+
+```bash
+jane offline submit jane.db --text "Inspect the simulated cup" --object cup
+jane offline run jane.db
+jane offline status jane.db
+```
+
+A new simulator fails twice, selects recovery, verifies the inspection and completes the
+goal. Restart preserves completion. Action intents, bounded retries, crash reconciliation,
+resource locks and pause/resume/stop controls are documented in
+[developer setup](docs/DEVELOPMENT.md#durable-actions-and-full-offline-loop-j08).
+This uses a scripted policy and local simulator; J09 adds a real model provider.

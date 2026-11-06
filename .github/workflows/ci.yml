@@ -31,3 +31,7 @@ jobs:
           /tmp/jane-wheel/bin/jane coordinator-demo > coordinator-first.json
           /tmp/jane-wheel/bin/jane coordinator-demo > coordinator-second.json
           cmp coordinator-first.json coordinator-second.json
+          /tmp/jane-wheel/bin/jane offline submit /tmp/jane-offline.db --text "Inspect simulated cup" --object cup
+          /tmp/jane-wheel/bin/jane offline run /tmp/jane-offline.db > /tmp/jane-offline-trace.json
+          /tmp/jane-wheel/bin/jane offline status /tmp/jane-offline.db > /tmp/jane-offline-status.json
+          python -c 'import json; s=json.load(open("/tmp/jane-offline-status.json")); assert s["goals"][0]["status"] == "completed"'

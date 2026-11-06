@@ -37,8 +37,56 @@ def main(argv: Sequence[str] | None = None) -> int:
     affect.add_argument("operation", choices=["status", "history", "configure", "recover", "reset"])
     affect.add_argument("database", type=Path)
     affect.add_argument("--file", type=Path)
+    offline = commands.add_parser("offline", help="run and control the durable offline simulator")
+    offline.add_argument(
+        "operation", choices=["submit", "run", "status", "timeline", "pause", "resume", "stop"]
+    )
+    offline.add_argument("database", type=Path)
+    offline.add_argument("--text")
+    offline.add_argument("--object", default="cup")
+    offline.add_argument("--max-steps", type=int, default=8)
     args = parser.parse_args(argv)
     try:
+        if args.command == "offline":
+            import asyncio
+
+            from jane.core.clock import SystemClock
+            from jane.offline import OfflineRuntime
+
+            journal = Journal(args.database)
+            runtime = None
+            try:
+                runtime = OfflineRuntime(
+                    journal, Path(str(args.database) + ".sim.db"), SystemClock()
+                )
+                if args.operation in {"submit", "run"}:
+                    runtime.startup()
+                if args.operation == "submit":
+                    if not args.text:
+                        raise ValueError("submit requires --text")
+                    result_data: object = {"task": runtime.submit(args.text, args.object)}
+                elif args.operation == "run":
+                    result_data = asyncio.run(runtime.run(args.max_steps))
+                elif args.operation == "timeline":
+                    result_data = {
+                        "events": [e.model_dump(mode="json") for e in journal.timeline()],
+                        "actions": [
+                            dict(row)
+                            for row in journal.db.execute(
+                                "SELECT * FROM action_changes ORDER BY seq"
+                            )
+                        ],
+                    }
+                else:
+                    if args.operation in {"pause", "resume", "stop"}:
+                        runtime.executor.control(args.operation)
+                    result_data = runtime.status()
+                sys.stdout.write(json.dumps(result_data, sort_keys=True) + "\n")
+                return 0
+            finally:
+                if runtime is not None:
+                    runtime.close()
+                journal.close()
         if args.command == "coordinator-demo":
             import asyncio
 

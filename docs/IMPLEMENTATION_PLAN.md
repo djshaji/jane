@@ -150,6 +150,8 @@ Each package should fit one focused change or a small sequence of changes with a
 
 ### J08 — Action intent, mock execution and verification
 
+**Implemented:** durable intents, registered offline tools, direct verification, bounded retries, reconciliation and the CLI offline loop. See [J08 scope](DEVELOPMENT.md#durable-actions-and-full-offline-loop-j08). Runtime ownership is single-process; real-tool isolation, provider calls and human review UI remain later work.
+
 **Depends on:** J07. **Architecture:** Section 12.
 
 - Implement tool registration with argument/result schemas, permission scope, resource keys, side-effect class and reconciliation contract.

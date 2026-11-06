@@ -41,3 +41,19 @@ class FakeClock:
         # Validate representability before mutating either time representation.
         self._start + timedelta(seconds=elapsed)
         self._elapsed = elapsed
+
+
+class SystemClock:
+    """UTC receipts plus process monotonic measurement for the offline CLI."""
+
+    @property
+    def session_id(self) -> str:
+        return "offline-runtime"
+
+    def now(self) -> datetime:
+        return datetime.now(UTC)
+
+    def monotonic(self) -> float:
+        import time
+
+        return time.monotonic()
