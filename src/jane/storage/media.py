@@ -44,6 +44,7 @@ def normalize(data: bytes) -> tuple[bytes, int, int, str]:
                 raise ValueError("image dimensions exceed limits")
             image.load()
             rgb = image.convert("RGB")
+            rgb.info.clear()
             # Low contrast is only a quality hint, never an object/occlusion claim.
             deviation = stats.Stat(rgb.convert("L")).stddev[0]
             quality = "uncertain" if deviation < 10 else "usable"

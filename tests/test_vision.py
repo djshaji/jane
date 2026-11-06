@@ -304,3 +304,14 @@ class VisionTests(unittest.TestCase):
         with patch("subprocess.run", side_effect=subprocess.TimeoutExpired("camera", 8)):
             with self.assertRaisesRegex(ValueError, "timed out"):
                 OpenCVCamera().capture()
+
+    def test_normalization_strips_exif_metadata(self):
+        image = Image.new("RGB", (32, 32), "white")
+        exif = Image.Exif()
+        exif[0x010E] = "private description"
+        original = io.BytesIO()
+        image.save(original, format="JPEG", exif=exif)
+        encoded, _, _, _ = normalize(original.getvalue())
+        with Image.open(io.BytesIO(encoded)) as clean:
+            self.assertFalse(clean.getexif())
+            self.assertNotIn("exif", clean.info)
