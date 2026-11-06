@@ -28,6 +28,7 @@ from jane.core.contracts import (
     ToolCall,
 )
 from jane.motivation.goals import Goals
+from jane.providers.openai import OpenAIAdapter, ProviderError
 from jane.storage.journal import Journal
 
 
@@ -36,6 +37,8 @@ class Limits(Contract):
     formatting_repairs: Annotated[int, Field(ge=0, le=1)] = 1
     timeout_seconds: Annotated[float, Field(gt=0, le=300)] = 30.0
     context: ContextBudget = ContextBudget()
+    provider_retries: Annotated[int, Field(ge=0, le=2)] = 1
+    retry_delay_seconds: Annotated[float, Field(ge=0, le=5)] = 1.0
 
 
 class Adapter(Protocol):
@@ -201,7 +204,13 @@ class Coordinator:
                 return self._error(request, task_id, interaction_id, "context_overflow", 0, 0, 0.0)
             decision = None
             category = "invalid_output"
-            for attempt in range(1 + self.limits.formatting_repairs):
+            repairs = 0
+            retries = 0
+            repair = False
+            for attempt in range(1 + self.limits.formatting_repairs + self.limits.provider_retries):
+                if self._cancelled:
+                    category = "cancelled"
+                    break
                 with self.journal.transaction():
                     used = self.journal.db.execute(
                         "SELECT coalesce(sum(calls),0) FROM cognitive_requests WHERE interaction=?",
@@ -214,7 +223,13 @@ class Coordinator:
                         "UPDATE cognitive_requests SET calls=calls+1 WHERE id=?", (request,)
                     )
                 calls += 1
-                self._task = asyncio.create_task(self.adapter.decide(snapshot, repair=attempt > 0))
+                if isinstance(self.adapter, OpenAIAdapter):
+                    self.adapter.reset_usage()
+                    self.journal.db.execute(
+                        "INSERT INTO provider_attempts VALUES(?,?,?)",
+                        (request, calls, json.dumps(self.adapter.metadata())),
+                    )
+                self._task = asyncio.create_task(self.adapter.decide(snapshot, repair=repair))
                 try:
                     signal = asyncio.create_task(self._cancel_signal.wait())
                     try:
@@ -241,9 +256,34 @@ class Coordinator:
                     self._task.cancel()
                     category = "cancelled"
                     break
+                except ProviderError as error:
+                    category = error.category
+                    if (
+                        error.category == "provider_malformed"
+                        and repairs < self.limits.formatting_repairs
+                    ):
+                        repairs += 1
+                        repair = True
+                        continue
+                    if error.retryable and retries < self.limits.provider_retries:
+                        retries += 1
+                        try:
+                            await asyncio.wait_for(
+                                self._cancel_signal.wait(), self.limits.retry_delay_seconds
+                            )
+                        except TimeoutError:
+                            pass
+                        continue
+                    break
                 except Exception:
                     category = "adapter_error"
                     break
+                finally:
+                    if isinstance(self.adapter, OpenAIAdapter):
+                        self.journal.db.execute(
+                            "UPDATE provider_attempts SET metadata=? WHERE request=? AND ordinal=?",
+                            (json.dumps(self.adapter.metadata()), request, calls),
+                        )
                 if self._cancelled:
                     category = "cancelled"
                     break
@@ -258,6 +298,10 @@ class Coordinator:
                     decision = DECISION.validate_json(raw)
                     break
                 except ValidationError:
+                    if repairs >= self.limits.formatting_repairs:
+                        break
+                    repairs += 1
+                    repair = True
                     continue
             if decision is not None:
                 with self.journal.transaction():

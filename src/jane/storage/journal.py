@@ -52,7 +52,7 @@ class Journal:
             self.db.execute("PRAGMA synchronous=FULL")
             with self.transaction():
                 version = self.db.execute("PRAGMA user_version").fetchone()[0]
-                if version not in (0, 1, 2, 3, 4, 5, 6):
+                if version not in (0, 1, 2, 3, 4, 5, 6, 7):
                     raise ValueError(f"unsupported database version: {version}")
                 if version == 0:
                     for statement in DDL:
@@ -145,6 +145,14 @@ class Journal:
                     )
                     self.db.execute("INSERT INTO runtime_control VALUES(1,0,0,0)")
                     self.db.execute("PRAGMA user_version=6")
+                if version < 7:
+                    self.db.execute(
+                        "CREATE TABLE provider_attempts(request INTEGER NOT NULL "
+                        "REFERENCES cognitive_requests(id),ordinal INTEGER NOT NULL,"
+                        "metadata TEXT NOT NULL,"
+                        "PRIMARY KEY(request,ordinal))"
+                    )
+                    self.db.execute("PRAGMA user_version=7")
         except BaseException:
             self.db.close()
             raise

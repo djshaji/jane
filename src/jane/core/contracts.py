@@ -194,6 +194,17 @@ class CognitiveError(Contract):
         "invalid_decision",
         "unauthorized",
         "unsupported_observation",
+        "provider_timeout",
+        "provider_network",
+        "provider_output_overflow",
+        "provider_malformed",
+        "provider_context_overflow",
+        "provider_rate_limit",
+        "provider_unavailable",
+        "provider_auth",
+        "provider_rejected",
+        "provider_incomplete",
+        "provider_refusal",
     ]
     calls: NonNegative
     output_bytes: NonNegative

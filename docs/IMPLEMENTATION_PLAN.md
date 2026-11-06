@@ -168,6 +168,8 @@ Each package should fit one focused change or a small sequence of changes with a
 
 ### J09 — One real LLM provider
 
+**Implemented, live acceptance pending:** text-only Responses adapter, explicit opt-in, bounded retries, usage audit and fake-provider suite. No API key was available during implementation; run the opt-in live contract test to verify deployment access and schema acceptance. See [J09 setup](DEVELOPMENT.md#first-live-text-provider-j09).
+
 **Depends on:** J08. **Architecture:** Sections 7, 11.
 
 - Select one provider/model by verifying current modality and structured-output capabilities against official documentation during implementation.
