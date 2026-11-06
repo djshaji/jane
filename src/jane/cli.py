@@ -37,17 +37,45 @@ def main(argv: Sequence[str] | None = None) -> int:
     affect.add_argument("operation", choices=["status", "history", "configure", "recover", "reset"])
     affect.add_argument("database", type=Path)
     affect.add_argument("--file", type=Path)
-    offline = commands.add_parser("offline", help="run and control the durable offline simulator")
-    offline.add_argument(
-        "operation", choices=["submit", "run", "status", "timeline", "pause", "resume", "stop"]
-    )
-    offline.add_argument("database", type=Path)
-    offline.add_argument("--text")
-    offline.add_argument("--object", default="cup")
-    offline.add_argument("--max-steps", type=int, default=8)
+    for mode in ("offline", "live"):
+        runtime_parser = commands.add_parser(
+            mode, help="run inspection tasks with " + mode + " cognition"
+        )
+        runtime_parser.add_argument(
+            "operation", choices=["submit", "run", "status", "timeline", "pause", "resume", "stop"]
+        )
+        runtime_parser.add_argument("database", type=Path)
+        runtime_parser.add_argument("--text")
+        runtime_parser.add_argument("--object", default="cup")
+        runtime_parser.add_argument("--max-steps", type=int, default=8)
+        if mode == "live":
+            runtime_parser.add_argument("--enable-live", action="store_true")
+            runtime_parser.add_argument("--max-calls", type=int, default=8)
+            runtime_parser.add_argument("--max-output-tokens", type=int, default=4096)
+            runtime_parser.add_argument(
+                "--reasoning", choices=["low", "medium", "high", "xhigh", "max"], default="medium"
+            )
     args = parser.parse_args(argv)
     try:
-        if args.command == "offline":
+        if args.command == "live" and args.operation == "run":
+            import asyncio
+
+            from jane.live import run_live
+
+            if not args.enable_live:
+                raise ValueError("live run requires --enable-live; snapshot data is sent to OpenAI")
+            result = asyncio.run(
+                run_live(
+                    args.database,
+                    args.max_steps,
+                    args.max_calls,
+                    args.max_output_tokens,
+                    args.reasoning,
+                )
+            )
+            sys.stdout.write(json.dumps(result, sort_keys=True) + "\n")
+            return 0
+        if args.command in {"offline", "live"}:
             import asyncio
 
             from jane.core.clock import SystemClock

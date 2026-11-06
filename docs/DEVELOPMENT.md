@@ -331,3 +331,93 @@ Cross-process leadership, interruptible real tools and hard process-isolated tim
 future work. Unknown outcomes deliberately block the offline loop pending reconciliation.
 Simulator timeout modes model ambiguous outcomes; they are not a production deadline runner.
 There is no universal exactly-once claim across arbitrary external systems.
+
+## First live text provider (J09)
+
+J09 adds an optional OpenAI Responses adapter for `gpt-6.1-sol`, default reasoning `medium`.
+The supported model/capability profile is explicit: text input, structured decision output,
+no media, hosted tools or arbitrary provider endpoints. Unsupported models/modalities fail
+configuration validation. The provider is interchangeable with the scripted adapter; the
+same J07 decision checks and J08 execution/postcondition checks remain authoritative.
+Only the local simulated inspection tool is exposed by this first live CLI.
+
+Official documentation checked on 6 November 2026:
+
+- [Model capabilities and reasoning settings](https://developers.openai.com/api/docs/models/gpt-6.1-sol)
+- [Structured output schema rules](https://developers.openai.com/api/docs/guides/structured-outputs)
+- [Responses API](https://developers.openai.com/api/docs/guides/responses)
+
+The model page publishes an alias rather than a dated snapshot. Requests record the exact
+requested alias, settings and returned model identifier; this does not guarantee unchanged
+behaviour if the alias changes. Structured output uses an object envelope containing the
+canonical decision union as nested `anyOf`. Provider schema conversion removes unsupported
+annotation/discriminator forms; strict internal Pydantic validation still runs afterward.
+The model only proposes decisions. No hosted tool is configured or executed by OpenAI.
+
+```bash
+python -m pip install -e '.[openai]'
+# Supply OPENAI_API_KEY through your local environment or secret manager.
+# Do not put the key in a goal file, command argument, committed file or database.
+jane live submit jane.db --text "Inspect the simulated cup and report what you observe" --object cup
+jane live run jane.db --enable-live --max-calls 8 --max-output-tokens 4096 --reasoning medium
+jane live status jane.db
+jane live timeline jane.db
+```
+
+Only `live run --enable-live` invokes inference. `live submit/status/timeline/pause/resume/stop`
+use the same local commands as offline mode. The explicit run flag acknowledges that the
+snapshot's task text and evidence will be sent to OpenAI and may incur API charges.
+`OPENAI_API_KEY` is required; missing credentials fail before opening/mutating a database.
+There is no fallback to a different model or offline policy after a provider failure.
+Install HTTPX SOCKS support separately if your configured proxy requires it; normal proxy
+and CA environment configuration is preserved. Redirects are disabled and the endpoint
+is fixed to `https://api.openai.com/v1/responses`.
+
+The adapter performs one HTTP attempt per `decide`. The coordinator permits at most one
+retry for 429 or selected 5xx errors by default (configurable 0–2); each counts against the
+same durable interaction call limit, including across restarts. It waits a bounded second
+between attempts. A malformed response permits at most one formatting repair. Authentication,
+refusal, incomplete output, timeout and ambiguous network failures are not automatically
+retried. All failures become typed error events and leave the goal recoverable. Timeout or
+cancellation aborts the local HTTP request and fences any late result; it cannot guarantee
+that remote processing or billing has stopped. Stop/pause controls still prevent stale
+results from dispatching actions, including when inference has already begun.
+
+Each call sets `max_output_tokens` (default 4096, configurable 256–8192), including reasoning
+usage. The coordinator defaults to eight total calls per interaction. Input snapshot limits
+remain byte-based; the provider adds a full request-body byte limit including instructions
+and schema. HTTP responses are streamed into a capped 1 MiB buffer and decision text retains
+the snapshot's byte limit. These are bounds, not an exact monetary budget or token estimate.
+An incomplete response can require an explicit configuration change before retrying.
+
+Migration 7 adds `provider_attempts`. Before each provider attempt, the runtime persists the
+model/settings; after it returns, it records HTTP status and API-reported input/output/total
+tokens when available. Generated decision fields cannot supply usage. Cancelled requests,
+transport failures and crashes may have unknown usage (`null`); do not count that as zero
+cost. Runtime call reservations survive even if the process dies before HTTP dispatch.
+The core request table continues to measure calls, output bytes and injected-clock elapsed
+time. No price estimate or hidden SDK retry is used.
+
+Credentials exist only in the transport Authorization header, never in snapshots or audit
+rows. Provider error bodies, refusal wording and raw exceptions are discarded; audit rows
+contain only whitelisted metadata. The normal journal still stores user evidence and
+accepted decisions under the existing J07 policy. Requests use `store=false`; this is an API
+storage setting, not a claim about the provider's broader retention policies.
+
+Tests use fake transports and HTTPX MockTransport: schema conversion, rate limits, retry
+budgets, malformed output/repair, timeout, cancellation, refusal, incomplete response,
+unsupported modality, usage spoofing, request size and sanitized HTTP errors. A fake
+provider also completes the full existing inspection loop without network access.
+
+The real contract test is **opt-in and paid**, with a maximum of one model request and no
+action execution:
+
+```bash
+JANE_LIVE_TEST=1 python -m unittest discover -s tests -p test_provider.py -v
+```
+
+It additionally requires `OPENAI_API_KEY` and the optional dependency. Default CI never
+sets this flag or needs a key. This implementation session had no configured API key, so
+live model availability, schema acceptance and real task quality remain unverified; run the
+opt-in test before enabling the adapter for regular use. Audio/camera input, semantic goal
+creation, general-purpose real tools and GUI remain outside J09's text inspection scope.
