@@ -145,6 +145,8 @@ class OpenAIAdapter:
         }
 
     def request(self, snapshot: Snapshot, repair: bool) -> dict[str, Any]:
+        if any(event.kind == "sensor.image" for event in snapshot.events):
+            raise ProviderError("unsupported_observation")
         instructions = (
             snapshot.instructions + " Return JSON with a single decision field. "
             "Copy request_id, task_id, generation and snapshot_id exactly. "

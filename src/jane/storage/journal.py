@@ -52,7 +52,7 @@ class Journal:
             self.db.execute("PRAGMA synchronous=FULL")
             with self.transaction():
                 version = self.db.execute("PRAGMA user_version").fetchone()[0]
-                if version not in (0, 1, 2, 3, 4, 5, 6, 7):
+                if version not in (0, 1, 2, 3, 4, 5, 6, 7, 8):
                     raise ValueError(f"unsupported database version: {version}")
                 if version == 0:
                     for statement in DDL:
@@ -153,6 +153,13 @@ class Journal:
                         "PRIMARY KEY(request,ordinal))"
                     )
                     self.db.execute("PRAGMA user_version=7")
+                if version < 8:
+                    self.db.execute(
+                        "CREATE TABLE assets(asset_id TEXT PRIMARY KEY,path TEXT NOT NULL UNIQUE,"
+                        "body TEXT NOT NULL,state TEXT NOT NULL "
+                        "CHECK(state IN ('retained','expired')))"
+                    )
+                    self.db.execute("PRAGMA user_version=8")
         except BaseException:
             self.db.close()
             raise
@@ -194,6 +201,12 @@ class Journal:
                 if old.model_dump(exclude=excluded) != event.model_dump(exclude=excluded):
                     raise ValueError("deduplication key reused for different content")
                 return int(rows[0]["seq"])
+            if event.kind == "sensor.image":
+                from jane.storage.media import read_asset
+
+                asset, _ = read_asset(self, event.payload.asset_id)
+                if asset.digest != event.payload.digest or asset.quality != event.payload.quality:
+                    raise ValueError("image event does not match finalized asset")
             cursor = self.db.execute(
                 "INSERT INTO events(event_id,source_id,source_event_id,body) VALUES(?,?,?,?)",
                 (event.event_id, event.source_id, event.source_event_id, body),

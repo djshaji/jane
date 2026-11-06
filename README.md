@@ -97,3 +97,9 @@ confirmed task submission, and interruptible local speech. Install `.[voice]` pl
 and eSpeak NG, then run `jane voice devices` and
 `jane voice session --enable-microphone --enable-live`. The task still inspects a simulated
 object. See [voice setup and hardware acceptance](docs/DEVELOPMENT.md#push-to-talk-voice-j10).
+
+J11's initial camera path adds on-demand capture, verified image assets and freshness checks.
+Install `.[camera]`, then use `jane camera --help`. Capture requires `--enable-camera`;
+keeping the image also requires `--retain-image`. Image evidence is task-linked, but the
+existing live provider remains text-only and rejects image contexts. See
+[camera setup and remaining integration](docs/DEVELOPMENT.md#on-demand-camera-evidence-j11).

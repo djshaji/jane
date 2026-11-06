@@ -119,6 +119,18 @@ class ObservationEvent(EventBase):
     payload: Observation
 
 
+class ImageEvidence(Contract):
+    asset_id: Identifier
+    digest: Annotated[str, Field(pattern=r"^[a-f0-9]{64}$")]
+    quality: Literal["usable", "uncertain"]
+
+
+class ImageEvent(EventBase):
+    kind: Literal["sensor.image"]
+    provenance_class: Literal["sensor_observation"]
+    payload: ImageEvidence
+
+
 class ResponseEvent(EventBase):
     kind: Literal["communication.response"]
     provenance_class: Literal["model_response"]
@@ -225,7 +237,8 @@ Event = Annotated[
     | ClaimEvent
     | SelfEvent
     | PredictionEvent
-    | CognitiveErrorEvent,
+    | CognitiveErrorEvent
+    | ImageEvent,
     Field(discriminator="kind"),
 ]
 EVENT: TypeAdapter[Event] = TypeAdapter(Event)

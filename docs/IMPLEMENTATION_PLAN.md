@@ -197,6 +197,8 @@ Each package should fit one focused change or a small sequence of changes with a
 
 ### J11 — Camera and multimodal context
 
+**Implementation status:** initial camera/evidence slice implemented; see [camera setup](DEVELOPMENT.md#on-demand-camera-evidence-j11). Verified assets, freshness/alignment checks and image-capability rejection are tested offline. Live vision-provider decisions, real-camera acceptance and the combined M3 demonstration remain pending.
+
 **Depends on:** J09; combined voice demonstration also needs J10. **Architecture:** Sections 5–7, 19.
 
 - Implement on-demand camera capture, asset finalization, digest/metadata and cleanup of incomplete assets.

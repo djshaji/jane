@@ -62,8 +62,21 @@ def main(argv: Sequence[str] | None = None) -> int:
     voice.add_argument("--object", default="cup")
     voice.add_argument("--enable-microphone", action="store_true")
     voice.add_argument("--enable-live", action="store_true")
+    camera = commands.add_parser("camera", help="on-demand image capture and retention")
+    camera.add_argument("operation", choices=["capture", "status", "expire", "recover"])
+    camera.add_argument("database", type=Path)
+    camera.add_argument("--device", type=int, default=0)
+    camera.add_argument("--task")
+    camera.add_argument("--asset")
+    camera.add_argument("--enable-camera", action="store_true")
+    camera.add_argument("--retain-image", action="store_true")
     args = parser.parse_args(argv)
     try:
+        if args.command == "camera":
+            from jane.vision.commands import camera_command
+
+            print(json.dumps(camera_command(args), sort_keys=True))
+            return 0
         if args.command == "voice":
             import asyncio
 

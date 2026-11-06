@@ -511,3 +511,94 @@ in the implementation environment):
 Live acoustic validation, durable audio diagnostics/usage, streamed partial transcription,
 and desktop push-to-talk controls remain follow-up work. This slice does not claim the full
 J10/M3 hardware acceptance gate has passed.
+
+## On-demand camera evidence (J11)
+
+This initial J11 slice captures and prepares actual image evidence. It does **not** yet
+identify objects through a live vision model or complete the M3 voice/camera demonstration.
+Camera capture is a separate CLI operation, and it never sends pixels over the network.
+
+```bash
+python -m pip install --no-build-isolation -e '.[camera]'
+# Use the task ID returned by offline/live submit, for example offline-1:
+jane camera capture jane.db --task offline-1 --device 0 --enable-camera
+# Explicitly retain pixels for later inspection:
+jane camera capture jane.db --task offline-1 --device 0 --enable-camera --retain-image
+jane camera status jane.db
+jane camera expire jane.db --asset image-REPLACE_WITH_RETURNED_ID
+# Exclusive recovery after a crash; stop all other JANE processes first:
+jane camera recover jane.db
+```
+
+`--enable-camera` permits a single capture, never monitoring. Without `--retain-image`, the
+CLI finalizes the image, commits its event, then expires the processing file before returning.
+The event and metadata remain; they cannot be used as available pixels after expiry. With
+explicit retention, the file stays in `jane.db.media` until `expire`. `recover` removes
+interrupted temporary/orphan files, expires leftover processing-only assets and completes
+interrupted deletion. Run recovery after a crash. No automatic timed retention policy or
+background collector is introduced. Use the existing single-writer/exclusive-startup model.
+
+The optional OpenCV backend runs in a separate one-shot Python worker. The parent enforces
+an eight-second timeout; a hung/disconnected driver is killed without blocking the engine
+indefinitely. The worker releases its device, requests 1280×720 and downscales larger frames
+before PNG encoding. Linux/OpenCV device indexes are used; permissions and driver support
+are system dependencies. No camera opens at import, install, status or help time.
+
+Pillow validates a single JPEG/PNG, bounds compressed input/output to 4 MiB and decoded
+images to four million pixels with each dimension at most 4096, converts to RGB PNG and
+removes supplied EXIF/other metadata. Standard deviation of grayscale intensity is a
+conservative low-contrast quality hint: flat/covered and heavily blurred fixture images
+request a clearer view. It is **not** a general blur, occlusion or object detector. A usable
+quality flag does not establish semantic confidence or object identity.
+
+Migration 8 adds `assets`: opaque ID, absolute managed path, validated metadata, SHA-256,
+byte size, MIME type, dimensions, creation time, quality, retention preference and lifecycle
+state. Media writes use a private temporary file, fsync, atomic rename and directory fsync
+before the asset row and `sensor.image` event commit in one SQLite transaction. The journal
+rejects references to missing, expired or mismatched assets. A crash between rename and DB
+commit can leave an orphan, which exclusive recovery removes. Never copy just the database
+when backing up retained media; moved paths require restoration to the original location
+in this first implementation. Digest checks detect corruption; they do not authenticate
+what the camera depicts.
+
+Image events retain task/turn/source IDs and host capture intervals. They enter the timeline
+without creating world-model identity or disappearance claims. Camera failures append source
+health events; a subsequent failure invalidates reuse of an older successful frame. A fresh
+successful capture restores source health. Missing, expired or corrupted files request a new
+capture rather than a fabricated caption.
+
+`CameraService.current` refreshes stale/invalid evidence even for an unchanged scene; a failed
+refresh never returns cached pixels. Freshness uses the capture start plus a conservative
+1000 ms uncertainty allowance. This is a configured allowance, not measured sensor exposure
+latency. Tight freshness requirements can reject even a new frame. Cross-input alignment
+requires the same task and turn and checks interval separation plus both clock uncertainties;
+nearby timestamps never prove that speech refers to a particular object.
+
+`ImageContext` hands an image-capable consumer the verified bytes and metadata. Freshness
+and integrity are checked again after its result returns; stale results are rejected.
+Processing-only assets expire after this handoff (including cancellation/failure); explicitly
+retained assets stay available. Consumer output is advisory and does not execute actions or
+bypass canonical decision validation. No production vision consumer is shipped in this slice.
+The scripted test consumer proves direct pixel access without claiming visual recognition.
+
+Latest image evidence is essential context: it cannot silently disappear because of the
+snapshot budget. The current J09 OpenAI adapter rejects image-bearing snapshots with
+`unsupported_observation` **before HTTP dispatch**. It never sends an image ID as a substitute
+for seeing pixels, and it does not silently fall back to a caption. Consequently an existing
+task with image evidence needs a future compatible adapter; text-only tasks continue to work.
+
+Offline tests cover explicit enablement, strict references, atomic failure/orphan recovery,
+restart, processing/retained lifecycles, stale stationary scenes, source failure/recovery,
+missing/corrupted media, covered/blurred fixtures, temporal alignment, late consumer results,
+modality rejection and bounded camera-worker timeout. Tests need Pillow but no OpenCV,
+camera device, model credentials or network. CI also exercises camera help from the wheel.
+
+Remaining acceptance: real device capture/unplug testing, calibrated quality and clock
+uncertainty, a live image-capable provider integrated with canonical decisions, wiring model
+observation requests to capture, and the combined spoken object-identification/confirmation
+flow. GUI integration remains in the desktop work packages. Do not mark J11/M3 complete
+until those gates pass.
+
+Backend references: [OpenCV Python installation](https://docs.opencv.org/4.13.0/db/dd1/tutorial_py_pip_install.html),
+[OpenCV package](https://pypi.org/project/opencv-python-headless/4.12.0.88/),
+[Pillow package](https://pypi.org/project/pillow/12.0.0/).
